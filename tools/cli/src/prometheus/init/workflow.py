@@ -319,9 +319,11 @@ class InitWorkflow:
             print(f"[DEBUG] App-instructions repo already exists at {self.instructions_path}")
             # Ensure standard folder structure exists
             self._create_folder_structure()
-            # Create .gitignore to exclude .github folder
+            # Create .gitignore (app repo excludes .prometheus.yml)
             self._create_gitignore()
-            # Push any new folders
+            # Ensure core submodule exists
+            self._add_core_submodule_to_instructions()
+            # Push any new folders/submodule
             if self.app_instructions_remote:
                 self._push_instructions_setup()
             return
@@ -349,13 +351,9 @@ class InitWorkflow:
 
                 if result.returncode == 0:
                     print("[DEBUG] Clone successful, setting up submodule...")
-                    # Successfully cloned, ensure .github exists
-                    (self.instructions_path / ".github").mkdir(
-                        parents=True, exist_ok=True
-                    )
                     # Create standard folder structure with .gitkeep files
                     self._create_folder_structure()
-                    # Create .gitignore to exclude .github folder
+                    # Create .gitignore (app repo excludes .prometheus.yml)
                     self._create_gitignore()
                     # Add core as submodule in the app instructions repo
                     self._add_core_submodule_to_instructions()
@@ -378,13 +376,10 @@ class InitWorkflow:
                 cwd=self.instructions_path,
             )
 
-        # Ensure .github directory exists for core submodule
-        (self.instructions_path / ".github").mkdir(parents=True, exist_ok=True)
-
         # Create standard folder structure with .gitkeep files
         self._create_folder_structure()
 
-        # Create .gitignore to exclude .github folder
+        # Create .gitignore (app repo excludes .prometheus.yml)
         self._create_gitignore()
 
         # Add core as submodule in the app instructions repo
