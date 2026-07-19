@@ -317,6 +317,8 @@ class InitWorkflow:
         # If it already exists, just ensure folders are created and push changes
         if instructions_exists:
             print(f"[DEBUG] App-instructions repo already exists at {self.instructions_path}")
+            # Detect and optionally clean up an older (pre app/+core/) layout
+            self._maybe_clean_legacy_structure()
             # Ensure standard folder structure exists
             self._create_folder_structure()
             # Create .gitignore (app repo excludes .prometheus.yml)
@@ -351,6 +353,8 @@ class InitWorkflow:
 
                 if result.returncode == 0:
                     print("[DEBUG] Clone successful, setting up submodule...")
+                    # Detect and optionally clean up an older (pre app/+core/) layout
+                    self._maybe_clean_legacy_structure()
                     # Create standard folder structure with .gitkeep files
                     self._create_folder_structure()
                     # Create .gitignore (app repo excludes .prometheus.yml)
@@ -387,6 +391,63 @@ class InitWorkflow:
         # Push if remote exists
         if self.app_instructions_remote:
             self._push_instructions_setup()
+
+    def _maybe_clean_legacy_structure(self) -> None:
+        """Detect an older instructions-repo layout and offer to clean it up.
+
+        Older versions of this tool created content folders (instructions/,
+        prompts/, skills/, config/, docs/) and the core submodule directly at
+        the repo root instead of under app/ and core/. If leftover entries from
+        that layout are detected, ask the user whether to remove them so the
+        repo can be rebuilt cleanly with the current app/ + core/ structure.
+
+        If the user declines, the legacy entries are left in place and will
+        simply coexist alongside the new app/ and core/ folders.
+        """
+        expected_entries = {".git", ".gitignore", ".gitmodules", "app", "core"}
+        try:
+            entries = [p.name for p in self.instructions_path.iterdir()]
+        except OSError:
+            return
+
+        legacy_entries = sorted(name for name in entries if name not in expected_entries)
+        if not legacy_entries:
+            return
+
+        print(f"[DEBUG] Detected legacy entries in instructions repo: {legacy_entries}")
+        try:
+            answer = (
+                input(
+                    "\nThe app-instructions repository contains files from an older "
+                    f"layout ({', '.join(legacy_entries)}).\n"
+                    "Remove them and rebuild with the current app/ + core/ structure? "
+                    "[y/N]: "
+                )
+                .strip()
+                .lower()
+            )
+        except (EOFError, KeyboardInterrupt):
+            answer = "n"
+
+        if answer not in ("y", "yes"):
+            print("[DEBUG] Keeping legacy entries as-is.")
+            return
+
+        import shutil
+
+        for name in legacy_entries:
+            path = self.instructions_path / name
+            # Try removing via git first so tracked files/submodules are staged
+            # for deletion (handles .gitmodules bookkeeping correctly).
+            self._run_git(["rm", "-rf", "--", name], cwd=self.instructions_path, check=False)
+            try:
+                if path.is_symlink() or path.is_file():
+                    path.unlink()
+                elif path.is_dir():
+                    shutil.rmtree(path)
+                print(f"[DEBUG] Removed legacy entry: {path}")
+            except OSError as e:
+                print(f"[DEBUG] Failed to remove {path}: {e}")
 
     def _create_folder_structure(self) -> None:
         """Create standard folder structure with .gitkeep files.
