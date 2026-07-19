@@ -648,3 +648,4 @@ class InitWorkflow:
             raise RuntimeError(message)
 
         return result.stdout.strip() or result.stderr.strip()
+
