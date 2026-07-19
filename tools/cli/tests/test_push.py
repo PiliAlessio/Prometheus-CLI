@@ -11,7 +11,7 @@ def _setup_test_repos(tmp_path):
     """Helper to set up app and instructions repos for testing."""
     app_root = tmp_path / "app"
     instructions_root = tmp_path / "app-instructions"  # Must match {app_name}-instructions
-    core_root = instructions_root / ".github" / "prometheus-core"
+    core_root = instructions_root / "prometheus-core"
 
     core_root.mkdir(parents=True)
     app_root.mkdir(parents=True)
@@ -57,11 +57,21 @@ class TestPushChanges:
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): "",
                 ("status", "--branch", "--porcelain"): "## main...origin/main [ahead 2]",
+                ("rev-list", "HEAD", "--count"): "2",
+                ("config", "--get", "user.name"): "",
+                ("config", "user.name", "Prometheus"): "",
+                ("config", "--get", "user.email"): "",
+                ("config", "user.email", "prometheus@localhost"): "",
             },
             core_root: {
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): "",
                 ("status", "--branch", "--porcelain"): "## main...origin/main [ahead 1]",
+                ("rev-list", "HEAD", "--count"): "1",
+                ("config", "--get", "user.name"): "",
+                ("config", "user.name", "Prometheus"): "",
+                ("config", "--get", "user.email"): "",
+                ("config", "user.email", "prometheus@localhost"): "",
             },
         }
 
@@ -70,7 +80,10 @@ class TestPushChanges:
             # Handle push command with branch
             if args_tuple[0:2] == ("push", "-u"):
                 return ""
-            return states[cwd][args_tuple]
+            # Handle commit command which has variable message
+            if len(args_tuple) >= 2 and args_tuple[0:2] == ("commit", "-m"):
+                return ""
+            return states[cwd].get(args_tuple, "")
 
         monkeypatch.setattr("prometheus.push._run_git", fake_run_git)
 
@@ -92,11 +105,21 @@ class TestPushChanges:
                 ("status", "--porcelain=v1", "-z"): " M README.md",
                 ("status", "--branch", "--porcelain"): "## main...origin/main [ahead 1]",
                 ("add", "-A"): "",
+                ("rev-list", "HEAD", "--count"): "2",
+                ("config", "--get", "user.name"): "",
+                ("config", "user.name", "Prometheus"): "",
+                ("config", "--get", "user.email"): "",
+                ("config", "user.email", "prometheus@localhost"): "",
             },
             core_root: {
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): "",
                 ("status", "--branch", "--porcelain"): "## main...origin/main",
+                ("rev-list", "HEAD", "--count"): "1",
+                ("config", "--get", "user.name"): "",
+                ("config", "user.name", "Prometheus"): "",
+                ("config", "--get", "user.email"): "",
+                ("config", "user.email", "prometheus@localhost"): "",
             },
         }
 
@@ -108,7 +131,7 @@ class TestPushChanges:
             # Handle push command with branch
             if args_tuple[0:2] == ("push", "-u"):
                 return ""
-            return states[cwd][args_tuple]
+            return states[cwd].get(args_tuple, "")
 
         monkeypatch.setattr("prometheus.push._run_git", fake_run_git)
 
@@ -128,16 +151,18 @@ class TestPushChanges:
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): " M README.md\0R  old.py\0new.py\0",
                 ("status", "--branch", "--porcelain"): "## main...origin/main [ahead 1]",
+                ("rev-list", "HEAD", "--count"): "1",
             },
             core_root: {
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): "?? src/core.py\0",
                 ("status", "--branch", "--porcelain"): "## main...origin/main",
+                ("rev-list", "HEAD", "--count"): "1",
             },
         }
 
         def fake_run_git(args, cwd, check=True):
-            return states[cwd][tuple(args)]
+            return states[cwd].get(tuple(args), "")
 
         monkeypatch.setattr("prometheus.push._run_git", fake_run_git)
 
@@ -163,11 +188,17 @@ class TestPushChanges:
                 ("status", "--porcelain=v1", "-z"): " M config/app.yml\0 M instructions/setup.md\0",
                 ("status", "--branch", "--porcelain"): "## main...origin/main [ahead 1]",
                 ("add", "-A"): "",
+                ("rev-list", "HEAD", "--count"): "2",
+                ("config", "--get", "user.name"): "",
+                ("config", "user.name", "Prometheus"): "",
+                ("config", "--get", "user.email"): "",
+                ("config", "user.email", "prometheus@localhost"): "",
             },
             core_root: {
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): "",
                 ("status", "--branch", "--porcelain"): "## main...origin/main",
+                ("rev-list", "HEAD", "--count"): "1",
             },
         }
 
@@ -179,7 +210,7 @@ class TestPushChanges:
             # Handle push command with branch
             if args_tuple[0:2] == ("push", "-u"):
                 return ""
-            return states[cwd][args_tuple]
+            return states[cwd].get(args_tuple, "")
 
         monkeypatch.setattr("prometheus.push._run_git", fake_run_git)
 
@@ -200,12 +231,18 @@ class TestPushChanges:
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): "",
                 ("status", "--branch", "--porcelain"): "## main...origin/main",
+                ("rev-list", "HEAD", "--count"): "1",
             },
             core_root: {
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): " M documentation/guide.md\0",
                 ("status", "--branch", "--porcelain"): "## main...origin/main [ahead 1]",
                 ("add", "-A"): "",
+                ("rev-list", "HEAD", "--count"): "2",
+                ("config", "--get", "user.name"): "",
+                ("config", "user.name", "Prometheus"): "",
+                ("config", "--get", "user.email"): "",
+                ("config", "user.email", "prometheus@localhost"): "",
             },
         }
 
@@ -217,7 +254,7 @@ class TestPushChanges:
             # Handle push command with branch
             if args_tuple[0:2] == ("push", "-u"):
                 return ""
-            return states[cwd][args_tuple]
+            return states[cwd].get(args_tuple, "")
 
         monkeypatch.setattr("prometheus.push._run_git", fake_run_git)
 
@@ -239,16 +276,18 @@ class TestPushChanges:
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): "",
                 ("status", "--branch", "--porcelain"): "## main...origin/main",
+                ("rev-list", "HEAD", "--count"): "0",
             },
             core_root: {
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): "",
                 ("status", "--branch", "--porcelain"): "## main...origin/main",
+                ("rev-list", "HEAD", "--count"): "0",
             },
         }
 
         def fake_run_git(args, cwd, check=True):
-            return states[cwd][tuple(args)]
+            return states[cwd].get(tuple(args), "")
 
         monkeypatch.setattr("prometheus.push._run_git", fake_run_git)
 
@@ -267,17 +306,26 @@ class TestPushChanges:
         setup_context_mock(app_root)
 
         def fake_run_git(args, cwd, check=True):
-            if args[0] == "push":
+            args_list = list(args)
+            if args_list[0] == "push":
                 if check:
                     raise RuntimeError("Push failed: connection refused")
                 return ""
             # For other commands, return valid responses
-            if args[0] == "rev-parse":
+            if args_list[0] == "rev-parse":
                 return "main"
-            elif args[0:2] == ["status", "--porcelain=v1"]:
+            elif args_list[0:2] == ["status", "--porcelain=v1"]:
                 return ""
-            elif args[0:2] == ["status", "--branch"]:
+            elif args_list[0:2] == ["status", "--branch"]:
                 return "## main...origin/main [ahead 1]"
+            elif args_list[0:2] == ["rev-list", "HEAD"]:
+                return "1"
+            elif args_list[0:2] == ["config", "--get"]:
+                return ""
+            elif args_list[0:2] == ["config", "user.name"]:
+                return ""
+            elif args_list[0:2] == ["config", "user.email"]:
+                return ""
             return ""
 
         monkeypatch.setattr("prometheus.push._run_git", fake_run_git)

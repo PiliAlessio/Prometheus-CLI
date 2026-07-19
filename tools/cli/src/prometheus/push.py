@@ -77,10 +77,10 @@ def detect_push_state(start_path: str | Path | None = None) -> PushSummary:
             f"Please run 'prometheus init' first."
         )
 
-    # The instructions repo might have a core submodule at .github/prometheus-core
+    # The instructions repo might have a core submodule at prometheus-core
     instructions_state = _inspect_repo(instructions_path, "app-instructions")
     core_state = None
-    core_path = instructions_path / ".github" / "prometheus-core"
+    core_path = instructions_path / "prometheus-core"
     if core_path.exists() and (core_path / ".git").exists():
         core_state = _inspect_repo(core_path, "prometheus-core submodule")
 
@@ -97,18 +97,8 @@ def push_changes(start_path: str | Path | None = None) -> PushSummary:
 
 
 def _inspect_repo(path: Path, name: str) -> RepoPushState:
-    # Get branch name - handle empty repos (no HEAD yet)
-    try:
-        branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=path)
-    except RuntimeError:
-        # Empty repo - no HEAD reference yet, use default branch
-        # Try to get the default branch from git config
-        try:
-            branch = _run_git(["config", "--get", "init.defaultBranch"], cwd=path, check=False)
-            if not branch:
-                branch = "main"  # Fallback to "main" as default
-        except Exception:
-            branch = "main"  # Fallback if all else fails
+    # Always use "main" as the default branch for push operations
+    branch = "main"
 
     modified_details = _get_modified_files(path)
     ahead_count = _get_ahead_count(path)
@@ -123,6 +113,10 @@ def _push_repo(state: RepoPushState) -> RepoPushState:
         # Add and commit modified files before pushing
         try:
             print(f"[DEBUG] Adding and committing {len(state.modified_files)} modified files in {state.name}...")
+
+            # Ensure git user.name and user.email are configured
+            _ensure_git_config(state.path)
+
             _run_git(["add", "-A"], cwd=state.path)
             _run_git(
                 ["commit", "-m", f"Update: Changes from {state.name} repository"],
@@ -174,7 +168,29 @@ def _get_modified_files(path: Path) -> list[ModifiedFile]:
     return files
 
 
+def _ensure_git_config(path: Path) -> None:
+    """Ensure git user.name and user.email are configured in the repository."""
+    try:
+        # Check if user.name is set
+        name = _run_git(["config", "--get", "user.name"], cwd=path, check=False)
+        if not name:
+            _run_git(["config", "user.name", "Prometheus"], cwd=path)
+
+        # Check if user.email is set
+        email = _run_git(["config", "--get", "user.email"], cwd=path, check=False)
+        if not email:
+            _run_git(["config", "user.email", "prometheus@localhost"], cwd=path)
+    except Exception:
+        pass  # If config fails, git commit will still provide a helpful error
+
+
 def _get_ahead_count(path: Path) -> int:
+    """Get the number of commits ahead of the remote tracking branch.
+
+    For repos with no remote tracking set up yet, returns the total number
+    of commits on the current branch if there are any.
+    """
+    # First try to get ahead count from status
     output = _run_git(["status", "--branch", "--porcelain"], cwd=path, check=False)
     for line in output.splitlines():
         if line.startswith("## ") and "ahead " in line:
@@ -183,6 +199,15 @@ def _get_ahead_count(path: Path) -> int:
                 return int(ahead_part.split(",", 1)[0])
             except ValueError:
                 return 0
+
+    # If no tracking branch, check if there are any commits locally
+    try:
+        count_output = _run_git(["rev-list", "HEAD", "--count"], cwd=path, check=False)
+        if count_output and not count_output.startswith("fatal:"):
+            return int(count_output.strip())
+    except (ValueError, RuntimeError):
+        pass
+
     return 0
 
 

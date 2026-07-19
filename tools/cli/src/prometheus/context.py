@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 APP_CONFIG_FILE = ".prometheus.yml"
-CORE_SUBMODULE_DIR = ".github/prometheus-core"
+CORE_SUBMODULE_DIR = "prometheus-core"
 
 
 @dataclass(frozen=True)

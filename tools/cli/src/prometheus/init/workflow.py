@@ -48,8 +48,10 @@ class InitWorkflow:
 
         Args:
             app_name: Name of the app repository
-            app_remote: Remote URL for app code repository
-            app_instructions_remote: Remote URL for app-specific instructions repo
+            app_remote: Remote URL or repo name for app code repository
+                (can be just repo name like 'my-app')
+            app_instructions_remote: Remote URL or repo name for app-specific instructions repo
+                (can be just repo name like 'my-app-instructions')
             core_remote: Remote URL for core instructions repo
             create_app_repo: If True, create app repo structure locally for new apps
             base_path: Where to store app repos (~/.prometheus by default)
@@ -57,16 +59,14 @@ class InitWorkflow:
         """
         self.config = Config()
         self.app_name = app_name
-        # Convert repo names to full URLs if needed
+        # Convert repo names to full URLs if needed (skip full URLs)
         self.app_remote = (
-            app_remote if (app_remote.startswith("__CREATE_WITH_GH__") or 
-                          app_remote.startswith("http://") or 
+            app_remote if (app_remote.startswith("http://") or
                           app_remote.startswith("https://"))
             else self.config.make_github_url(app_remote)
         ) if app_remote else None
         self.app_instructions_remote = (
-            app_instructions_remote if (app_instructions_remote.startswith("__CREATE_WITH_GH__") or
-                                       app_instructions_remote.startswith("http://") or
+            app_instructions_remote if (app_instructions_remote.startswith("http://") or
                                        app_instructions_remote.startswith("https://"))
             else self.config.make_github_url(app_instructions_remote)
         ) if app_instructions_remote else None
@@ -155,8 +155,9 @@ class InitWorkflow:
             )
 
         # Validate app instructions remote (if provided)
-        if self.app_instructions_remote and not self._is_remote_accessible(
+        if (
             self.app_instructions_remote
+            and not self._is_remote_accessible(self.app_instructions_remote)
         ):
             raise RuntimeError(
                 f"App instructions remote is not accessible: {self.app_instructions_remote}\n"
@@ -302,48 +303,33 @@ class InitWorkflow:
 
         Behavior:
         - If app_instructions_remote is provided and accessible: clones from that URL
-        - If app_instructions_remote starts with __CREATE_WITH_GH__: tries GitHub CLI
         - If app_instructions_remote is not provided: creates a local git repo
           (user can push later)
         - Either way: ensures .github structure exists and adds core as submodule
+        - If remote exists, commits and pushes the submodule setup
 
         Raises:
             RuntimeError: If critical operations fail.
         """
-        # If instructions already exists and has .git, skip
-        if (self.instructions_path / ".git").exists():
-            return
+        # Check if instructions repo already exists
+        instructions_exists = (self.instructions_path / ".git").exists()
 
-        # Check if this is a GitHub CLI creation request
-        if self.app_instructions_remote and self.app_instructions_remote.startswith(
-            "__CREATE_WITH_GH__"
-        ):
-            repo_name = self.app_instructions_remote.replace("__CREATE_WITH_GH__", "").strip()
-            # Create local repo first
-            self.instructions_path.mkdir(parents=True, exist_ok=True)
-            self._run_git(["init"], cwd=self.instructions_path)
-
-            # Try to create on GitHub
-            gh_url = self._try_create_repo_with_gh(repo_name)
-            if gh_url:
-                self.app_instructions_remote = gh_url
-                self._run_git(
-                    ["remote", "add", "origin", gh_url],
-                    cwd=self.instructions_path,
-                )
-            else:
-                # gh failed or not available, continue with local-only
-                self.app_instructions_remote = None
-
-            # Ensure .github directory exists for core submodule
-            (self.instructions_path / ".github").mkdir(parents=True, exist_ok=True)
-            # Add core as submodule in the app instructions repo
-            self._add_core_submodule_to_instructions()
+        # If it already exists, just ensure folders are created and push changes
+        if instructions_exists:
+            print(f"[DEBUG] App-instructions repo already exists at {self.instructions_path}")
+            # Ensure standard folder structure exists
+            self._create_folder_structure()
+            # Create .gitignore to exclude .github folder
+            self._create_gitignore()
+            # Push any new folders
+            if self.app_instructions_remote:
+                self._push_instructions_setup()
             return
 
         # Try to clone app instructions repo if a remote was provided
         if self.app_instructions_remote:
             try:
+                print(f"[DEBUG] Attempting to clone {self.app_instructions_remote}...")
                 result = subprocess.run(
                     [
                         "git",
@@ -356,14 +342,29 @@ class InitWorkflow:
                     check=False,
                 )
 
+                print(f"[DEBUG] Clone returned: {result.returncode}")
+                if result.returncode != 0:
+                    print(f"[DEBUG] Clone stderr: {result.stderr}")
+                    print(f"[DEBUG] Clone stdout: {result.stdout}")
+
                 if result.returncode == 0:
+                    print("[DEBUG] Clone successful, setting up submodule...")
                     # Successfully cloned, ensure .github exists
-                    (self.instructions_path / ".github").mkdir(parents=True, exist_ok=True)
+                    (self.instructions_path / ".github").mkdir(
+                        parents=True, exist_ok=True
+                    )
+                    # Create standard folder structure with .gitkeep files
+                    self._create_folder_structure()
+                    # Create .gitignore to exclude .github folder
+                    self._create_gitignore()
                     # Add core as submodule in the app instructions repo
                     self._add_core_submodule_to_instructions()
+                    # Push the setup to remote if this was a newly created repo
+                    self._push_instructions_setup()
                     return
 
-            except Exception:
+            except Exception as e:
+                print(f"[DEBUG] Exception during clone: {e}")
                 pass
 
         # If no remote provided or clone failed, create structure locally
@@ -380,84 +381,223 @@ class InitWorkflow:
         # Ensure .github directory exists for core submodule
         (self.instructions_path / ".github").mkdir(parents=True, exist_ok=True)
 
+        # Create standard folder structure with .gitkeep files
+        self._create_folder_structure()
+
+        # Create .gitignore to exclude .github folder
+        self._create_gitignore()
+
         # Add core as submodule in the app instructions repo
         self._add_core_submodule_to_instructions()
+        # Push if remote exists
+        if self.app_instructions_remote:
+            self._push_instructions_setup()
 
-    def _try_create_repo_with_gh(self, repo_name: str) -> str | None:
-        """Attempt to create a GitHub repository using GitHub CLI.
+    def _create_folder_structure(self) -> None:
+        """Create standard folder structure with .gitkeep files.
 
-        Args:
-            repo_name: Name for the repository (e.g., 'my-app-instructions')
+        Creates content folders in the app-specific instructions repository:
+        - instructions/ - for app-specific instructions
+        - prompts/ - for AI prompts and instructions
+        - skills/ - for domain-specific skills
+        - config/ - for configuration files
+        - docs/ - for documentation
 
-        Returns:
-            Repository HTTPS URL if created successfully, None if gh unavailable
-            or creation failed. Falls back gracefully.
+        Note: .github folder is NOT created here - it's only in the app code repo.
+        These content folders will be merged into the app code repo.
+
+        Each folder gets a .gitkeep file to ensure Git tracks empty directories.
+        """
+        folders = [
+            "instructions",
+            "prompts",
+            "skills",
+            "config",
+            "docs",
+        ]
+
+        print(f"[DEBUG] Creating folder structure in {self.instructions_path}")
+        for folder_name in folders:
+            folder_path = self.instructions_path / folder_name
+            folder_path.mkdir(parents=True, exist_ok=True)
+            print(f"[DEBUG] Created folder: {folder_path}")
+
+            # Create .gitkeep file to ensure Git tracks the empty directory
+            gitkeep_path = folder_path / ".gitkeep"
+            if not gitkeep_path.exists():
+                gitkeep_path.write_text("")
+                print(f"[DEBUG] Created .gitkeep: {gitkeep_path}")
+            else:
+                print(f"[DEBUG] .gitkeep already exists: {gitkeep_path}")
+
+    def _push_instructions_setup(self) -> None:
+        """Commit and push the instructions setup to remote.
+
+        Commits the .gitmodules and core submodule setup, then pushes to origin.
+        Handles failures gracefully - doesn't block initialization.
         """
         try:
-            # Check if gh command is available
+            # Ensure git user config is set for this repo (needed for commits)
+            # Check if user.name and user.email are configured
+            user_name_result = subprocess.run(
+                ["git", "config", "user.name"],
+                cwd=self.instructions_path,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if not user_name_result.stdout.strip():
+                print("[DEBUG] Setting git user.name...")
+                self._run_git(
+                    ["config", "user.name", "Prometheus"],
+                    cwd=self.instructions_path,
+                    check=False,
+                )
+
+            user_email_result = subprocess.run(
+                ["git", "config", "user.email"],
+                cwd=self.instructions_path,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+
+            if not user_email_result.stdout.strip():
+                print("[DEBUG] Setting git user.email...")
+                self._run_git(
+                    ["config", "user.email", "prometheus@localhost"],
+                    cwd=self.instructions_path,
+                    check=False,
+                )
+
+            # Stage all changes (including .gitmodules and submodule)
+            self._run_git(["add", "-A"], cwd=self.instructions_path)
+
+            # Check if there are changes to commit
             result = subprocess.run(
-                ["gh", "--version"],
+                ["git", "status", "--porcelain"],
+                cwd=self.instructions_path,
                 capture_output=True,
                 text=True,
                 timeout=5,
                 check=False,
             )
 
-            if result.returncode != 0:
-                return None  # gh not available
+            print(f"[DEBUG] Git status output:\n{result.stdout}")
 
-            # Try to create repo
-            result = subprocess.run(
-                [
-                    "gh",
-                    "repo",
-                    "create",
-                    repo_name,
-                    "--public",
-                    "--source=.",
-                    "--remote=origin",
-                    "--push=false",
-                ],
-                cwd=self.instructions_path,
-                capture_output=True,
-                text=True,
-                timeout=30,
-                check=False,
-            )
+            if result.stdout.strip():
+                print(f"[DEBUG] Found changes to commit in {self.instructions_path}")
+                print(f"[DEBUG] Changes:\n{result.stdout}")
 
-            if result.returncode == 0:
-                # Extract repo URL from gh output or construct it
-                # gh outputs: "✓ Created repository {owner}/{repo} on GitHub"
-                # We need to construct the HTTPS URL
-                try:
-                    # Get GitHub username if not in output
-                    user_result = subprocess.run(
-                        ["gh", "api", "user", "-q", ".login"],
+                # Check if this is the initial commit (no HEAD yet)
+                head_result = subprocess.run(
+                    ["git", "rev-parse", "--verify", "HEAD"],
+                    cwd=self.instructions_path,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                is_initial_commit = head_result.returncode != 0
+                print(f"[DEBUG] Is initial commit: {is_initial_commit}")
+
+                # There are changes to commit
+                commit_result = self._run_git(
+                    ["commit", "-m", "Setup: Initialize repository structure"],
+                    cwd=self.instructions_path,
+                    check=False,
+                )
+                print(f"[DEBUG] Commit output: {commit_result}")
+
+                # Check current branch info
+                branch_result = subprocess.run(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                    cwd=self.instructions_path,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                current_branch = branch_result.stdout.strip()
+                print(f"[DEBUG] Current branch: {current_branch}")
+
+                # Check if origin exists
+                remote_result = subprocess.run(
+                    ["git", "remote", "-v"],
+                    cwd=self.instructions_path,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                print(f"[DEBUG] Remotes: {remote_result.stdout}")
+
+                # If we have a non-detached branch, try to push it
+                if current_branch and current_branch != "HEAD":
+                    print(f"[DEBUG] Attempting to push current branch {current_branch}...")
+                    push_result = subprocess.run(
+                        ["git", "push", "-u", "origin", current_branch],
+                        cwd=self.instructions_path,
                         capture_output=True,
                         text=True,
-                        timeout=10,
+                        timeout=30,
                         check=False,
                     )
-                    if user_result.returncode == 0:
-                        username = user_result.stdout.strip()
-                        repo_url = f"https://github.com/{username}/{repo_name}.git"
-                        return repo_url
-                except Exception:
-                    pass
+                    print(f"[DEBUG] Push returned: {push_result.returncode}")
+                    if push_result.returncode != 0:
+                        print(f"[DEBUG] Push stderr: {push_result.stderr}")
+                        print(f"[DEBUG] Push stdout: {push_result.stdout}")
+                    else:
+                        print(f"[INFO] Successfully pushed to origin {current_branch}")
+                        return
 
-            return None
+                # If that didn't work, push to main (default branch)
+                print(f"[DEBUG] Attempting to push to origin main...")
+                push_result = subprocess.run(
+                    ["git", "push", "-u", "origin", "main"],
+                    cwd=self.instructions_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                print(f"[DEBUG] Push to main returned: {push_result.returncode}")
+                if push_result.returncode != 0:
+                    print(f"[DEBUG] Push stderr: {push_result.stderr}")
+                    print(f"[DEBUG] Push stdout: {push_result.stdout}")
+                if push_result.returncode == 0:
+                    print(f"[INFO] Successfully pushed to origin main")
+                    return  # Push succeeded
 
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return None
-        except Exception:
-            return None
+                # If specific branches failed, try forcing push with --set-upstream (creates branch if needed)
+                print("[DEBUG] Trying forced push with HEAD refspec...")
+                push_result = subprocess.run(
+                    ["git", "push", "-f", "origin", "HEAD"],
+                    cwd=self.instructions_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                print(f"[DEBUG] Push HEAD returned: {push_result.returncode}")
+                if push_result.returncode != 0:
+                    print(f"[DEBUG] Push stderr: {push_result.stderr}")
+                    print(f"[DEBUG] Push stdout: {push_result.stdout}")
+                else:
+                    print(f"[INFO] Successfully pushed to origin HEAD")
+            else:
+                print("[DEBUG] No changes to commit in instructions repo")
+        except Exception as e:
+            # Don't fail initialization if push fails
+            # User can manually push later
+            import traceback
+            print(f"[ERROR] Failed to push instructions setup: {e}")
+            traceback.print_exc()
 
     def _add_core_submodule_to_instructions(self) -> None:
         """Add core as a submodule in the app-specific instructions repository.
 
         Removes CLI and docs folders to keep only essential core structure.
         """
-        core_submodule_path = self.instructions_path / ".github" / "prometheus-core"
+        core_submodule_path = self.instructions_path / "prometheus-core"
 
         # Check if already a submodule
         if (core_submodule_path / ".git").exists():
@@ -466,7 +606,7 @@ class InitWorkflow:
         try:
             # Add core as submodule
             self._run_git(
-                ["submodule", "add", self.core_remote, ".github/prometheus-core"],
+                ["submodule", "add", self.core_remote, "prometheus-core"],
                 cwd=self.instructions_path,
                 check=False,
             )
@@ -486,7 +626,12 @@ class InitWorkflow:
             pass
 
     def _create_gitignore(self) -> None:
-        """Create .gitignore in app code repo to exclude .prometheus.yml (local config)."""
+        """Create .gitignore files in app repo.
+
+        App repo: excludes .prometheus.yml (local config)
+        Instructions repo: no gitignore needed (contains tracked content folders and core submodule)
+        """
+        # App code repo .gitignore
         gitignore_path = self.app_path / ".gitignore"
 
         # If .gitignore already exists, just ensure .prometheus.yml is in it
@@ -533,7 +678,7 @@ class InitWorkflow:
             Git commit hash of core HEAD, or "unknown" if unable to retrieve.
         """
         # Try to get from app-specific instructions repo if it exists
-        core_submodule_path = self.instructions_path / ".github" / "prometheus-core"
+        core_submodule_path = self.instructions_path / "prometheus-core"
 
         if (core_submodule_path / ".git").exists():
             revision = self._run_git(["rev-parse", "HEAD"], cwd=core_submodule_path, check=False)
