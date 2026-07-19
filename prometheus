@@ -1,0 +1,19 @@
+#!/bin/bash
+# Wrapper script to run Prometheus CLI commands with automatic venv activation
+
+# Find the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
+
+VENV_PATH=".venv"
+
+# Check if venv exists
+if [ ! -f "$VENV_PATH/bin/activate" ]; then
+    echo "Error: Virtual environment not found at $VENV_PATH"
+    echo "Run ./install.sh first to set up the environment"
+    exit 1
+fi
+
+# Activate venv and run command
+source "$VENV_PATH/bin/activate"
+prometheus "$@"
