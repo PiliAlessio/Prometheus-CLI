@@ -53,17 +53,20 @@ def push():
 @click.option(
     "--app-remote",
     default=None,
-    help="Remote URL for the app code repository (GitHub, etc). Required unless creating local-only structure.",
+    help="App code repository: full URL or just repo name (e.g., 'my-app'). "
+    "Required unless creating local-only structure.",
 )
 @click.option(
     "--app-instructions-remote",
     default=None,
-    help="Remote URL for the app-specific instructions repository. If not provided, will prompt in interactive mode.",
+    help="App instructions repository: full URL or just repo name. "
+    "If not provided, will prompt in interactive mode.",
 )
 @click.option(
     "--core-remote",
     default=None,
-    help="Remote URL for the core instructions repository. Defaults to https://github.com/PiliAlessio/Prometheus.git",
+    help="Core instructions repository URL. "
+    "Defaults to https://github.com/PiliAlessio/Prometheus.git",
 )
 @click.option(
     "--create-app-repo",

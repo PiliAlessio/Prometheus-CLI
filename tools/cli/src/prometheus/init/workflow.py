@@ -55,9 +55,17 @@ class InitWorkflow:
             base_path: Where to store app repos (~/.prometheus by default)
             current_dir: Current working directory for symlink creation
         """
+        self.config = Config()
         self.app_name = app_name
-        self.app_remote = app_remote
-        self.app_instructions_remote = app_instructions_remote
+        # Convert repo names to full URLs if needed
+        self.app_remote = (
+            self.config.make_github_url(app_remote) if app_remote else None
+        )
+        self.app_instructions_remote = (
+            self.config.make_github_url(app_instructions_remote)
+            if app_instructions_remote
+            else None
+        )
         self.core_remote = core_remote or DEFAULT_CORE_REPO_URL
         self.create_app_repo = create_app_repo
         self.base_path = Path(base_path or Path.home() / ".prometheus")

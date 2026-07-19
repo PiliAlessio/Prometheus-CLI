@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ class Config:
         app_remote: str | None = None,
         app_instructions_remote: str | None = None,
         core_remote: str | None = None,
+        github_base_url: str | None = None,
     ):
         """Initialize the configuration manager.
 
@@ -31,6 +33,8 @@ class Config:
             app_remote: Remote URL for the app code repository
             app_instructions_remote: Remote URL for the app-specific instructions repository
             core_remote: Remote URL for the core instructions repository
+            github_base_url: Base GitHub URL for constructing repo URLs
+                (e.g., https://github.com/username)
         """
         self.app_name = app_name
         self.languages = languages or []
@@ -39,6 +43,12 @@ class Config:
         self.app_instructions_remote = app_instructions_remote
         self.core_remote = core_remote
         self.core_version = core_version
+        # Default GitHub base URL from env or use PiliAlessio as default
+        self.github_base_url = (
+            github_base_url
+            or os.environ.get("PROMETHEUS_GITHUB_BASE_URL")
+            or "https://github.com/PiliAlessio"
+        )
 
     @property
     def project_name(self):
@@ -60,6 +70,23 @@ class Config:
         """Backward compatible alias for older callers."""
         self.remote_url = value
 
+    def make_github_url(self, repo_name: str) -> str:
+        """Construct a full GitHub URL from a repo name.
+
+        If the repo_name is already a full URL, return it as-is.
+        Otherwise, construct it from github_base_url and repo_name.
+
+        Args:
+            repo_name: Repository name (e.g., 'my-app') or full URL
+
+        Returns:
+            Full GitHub repository URL
+        """
+        if repo_name.startswith("http://") or repo_name.startswith("https://"):
+            return repo_name
+        # Construct URL: base_url/repo_name.git
+        return f"{self.github_base_url}/{repo_name}.git"
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize configuration to a dictionary."""
         return {
@@ -70,6 +97,7 @@ class Config:
             "core_remote": self.core_remote,
             "core_version": self.core_version,
             "languages": self.languages,
+            "github_base_url": self.github_base_url,
         }
 
     @classmethod
@@ -86,6 +114,7 @@ class Config:
             core_remote=data.get("core_remote"),
             core_version=data.get("core_version"),
             languages=list(data.get("languages") or []),
+            github_base_url=data.get("github_base_url"),
         )
 
     @classmethod
@@ -114,6 +143,7 @@ class Config:
         self.app_instructions_remote = loaded.app_instructions_remote
         self.core_remote = loaded.core_remote
         self.core_version = loaded.core_version
+        self.github_base_url = loaded.github_base_url
         return self
 
     def save(self, path):
