@@ -73,10 +73,10 @@ def _create_repo_with_gh(repo_name: str) -> str | None:
             print("[DEBUG] gh command not available")
             return None  # gh not available
 
-        # Try to create repo (public, interactive to handle authentication)
+        # Try to create repo (public, no automatic push - we'll do manual push later)
         print(f"[DEBUG] Creating GitHub repository '{repo_name}'...")
         result = subprocess.run(
-            ["gh", "repo", "create", repo_name, "--public", "--remote=origin", "--push=false"],
+            ["gh", "repo", "create", repo_name, "--public"],
             capture_output=True,
             text=True,
             timeout=30,
