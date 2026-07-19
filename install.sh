@@ -59,10 +59,10 @@ write_info() {
 }
 
 # 1. Check repository structure
-write_info "Verifying Prometheus repository structure..."
-for path in "tools/cli" ".git" "core"; do
+write_info "Verifying Prometheus-CLI repository structure..."
+for path in "tools/cli" ".git"; do
     if [ ! -d "$path" ]; then
-        write_error "Missing $path - run this script from Prometheus root directory"
+        write_error "Missing $path - run this script from Prometheus-CLI root directory"
     fi
 done
 write_success "Repository structure verified"

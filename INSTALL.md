@@ -6,8 +6,8 @@
 
 ```powershell
 # Clone or pull the latest code
-git clone https://github.com/PiliAlessio/Prometheus.git
-cd Prometheus
+git clone https://github.com/PiliAlessio/Prometheus-CLI.git
+cd Prometheus-CLI
 
 # Run the installation script
 .\install.ps1
@@ -38,8 +38,8 @@ cd Prometheus
 
 ```bash
 # Clone or pull the latest code
-git clone https://github.com/PiliAlessio/Prometheus.git
-cd Prometheus
+git clone https://github.com/PiliAlessio/Prometheus-CLI.git
+cd Prometheus-CLI
 
 # Run the installation script
 chmod +x install.sh

@@ -52,11 +52,11 @@ function Write-Info {
 }
 
 # 1. Check repository structure
-Write-Info "Verifying Prometheus repository structure..."
-$required_paths = @("tools/cli", ".git", "core")
+Write-Info "Verifying Prometheus-CLI repository structure..."
+$required_paths = @("tools/cli", ".git")
 foreach ($path in $required_paths) {
     if (-not (Test-Path $path)) {
-        Write-Error "Missing $path - run this script from Prometheus root directory"
+        Write-Error "Missing $path - run this script from Prometheus-CLI root directory"
     }
 }
 Write-Success "Repository structure verified"
