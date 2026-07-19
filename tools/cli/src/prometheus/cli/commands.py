@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import subprocess
 import sys
 from pathlib import Path
 
@@ -46,6 +47,59 @@ def push():
         raise click.ClickException(str(exc)) from exc
 
     _echo_push_summary(summary)
+
+
+def _create_repo_with_gh(repo_name: str) -> str | None:
+    """Create a GitHub repository using GitHub CLI (gh).
+
+    Args:
+        repo_name: Name for the repository (e.g., 'my-app-instructions')
+
+    Returns:
+        Repository HTTPS URL if created successfully, None if gh unavailable
+        or creation failed.
+    """
+    try:
+        # Check if gh command is available
+        result = subprocess.run(
+            ["gh", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            return None  # gh not available
+
+        # Try to create repo (public, interactive to handle authentication)
+        result = subprocess.run(
+            ["gh", "repo", "create", repo_name, "--public", "--remote=origin", "--push=false"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+
+        if result.returncode == 0:
+            # Get GitHub username and construct the URL
+            try:
+                user_result = subprocess.run(
+                    ["gh", "api", "user", "-q", ".login"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                    check=False,
+                )
+                if user_result.returncode == 0:
+                    username = user_result.stdout.strip()
+                    return f"https://github.com/{username}/{repo_name}.git"
+            except Exception:
+                pass
+
+        return None
+    except Exception:
+        return None
 
 
 @cli.command()
@@ -120,8 +174,20 @@ def init(app_name, app_remote, app_instructions_remote, core_remote, create_app_
                     default=f"{app_name}-instructions",
                     type=str,
                 ).strip()
-                # The InitWorkflow will attempt gh creation
-                app_instructions_remote = f"__CREATE_WITH_GH__{gh_repo_name}"
+                # Create the repo directly with gh CLI
+                click.echo("  Creating repository on GitHub...")
+                repo_url = _create_repo_with_gh(gh_repo_name)
+                if repo_url:
+                    app_instructions_remote = repo_url
+                    click.echo(f"  ✓ Created: {repo_url}")
+                else:
+                    click.echo(
+                        "  ✗ Failed to create repository. Please ensure:"
+                    )
+                    click.echo("    - GitHub CLI is installed (gh --version)")
+                    click.echo("    - You are authenticated (gh auth status)")
+                    click.echo("    - You have permission to create repositories")
+                    click.echo("  Continuing with local-only setup.")
 
     workflow = InitWorkflow(
         app_name=app_name,
