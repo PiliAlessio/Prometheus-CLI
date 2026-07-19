@@ -305,7 +305,7 @@ class InitWorkflow:
         - If app_instructions_remote is provided and accessible: clones from that URL
         - If app_instructions_remote is not provided: creates a local git repo
           (user can push later)
-        - Either way: ensures .github structure exists and adds core as submodule
+        - Either way: ensures app/ folder structure exists and adds core as submodule
         - If remote exists, commits and pushes the submodule setup
 
         Raises:
@@ -391,24 +391,32 @@ class InitWorkflow:
     def _create_folder_structure(self) -> None:
         """Create standard folder structure with .gitkeep files.
 
-        Creates content folders in the app-specific instructions repository:
-        - instructions/ - for app-specific instructions
-        - prompts/ - for AI prompts and instructions
-        - skills/ - for domain-specific skills
-        - config/ - for configuration files
-        - docs/ - for documentation
+        Creates content folders under app/ in the app-specific instructions repository:
+        - app/instructions/ - for app-specific instructions
+        - app/prompts/ - for AI prompts and instructions
+        - app/skills/ - for domain-specific skills
+        - app/config/ - for configuration files
+        - app/docs/ - for documentation
 
-        Note: .github folder is NOT created here - it's only in the app code repo.
-        These content folders will be merged into the app code repo.
+        The core/ submodule lives as a sibling of app/ at the repo root, so the
+        final layout is:
+            {app_name}-instructions/
+            ├── app/
+            │   ├── instructions/
+            │   ├── prompts/
+            │   ├── skills/
+            │   ├── config/
+            │   └── docs/
+            └── core/ (git submodule)
 
         Each folder gets a .gitkeep file to ensure Git tracks empty directories.
         """
         folders = [
-            "instructions",
-            "prompts",
-            "skills",
-            "config",
-            "docs",
+            "app/instructions",
+            "app/prompts",
+            "app/skills",
+            "app/config",
+            "app/docs",
         ]
 
         print(f"[DEBUG] Creating folder structure in {self.instructions_path}")
@@ -592,7 +600,7 @@ class InitWorkflow:
 
         Removes CLI and docs folders to keep only essential core structure.
         """
-        core_submodule_path = self.instructions_path / "prometheus-core"
+        core_submodule_path = self.instructions_path / "core"
 
         # Check if already a submodule
         if (core_submodule_path / ".git").exists():
@@ -601,7 +609,7 @@ class InitWorkflow:
         try:
             # Add core as submodule
             self._run_git(
-                ["submodule", "add", self.core_remote, "prometheus-core"],
+                ["submodule", "add", self.core_remote, "core"],
                 cwd=self.instructions_path,
                 check=False,
             )
@@ -617,7 +625,7 @@ class InitWorkflow:
             self._cleanup_submodule_folders(core_submodule_path)
 
         except Exception:
-            # If submodule add fails, that's ok - the .github structure was created
+            # If submodule add fails, that's ok - the app/ folder structure was created
             pass
 
     def _create_gitignore(self) -> None:
@@ -673,7 +681,7 @@ class InitWorkflow:
             Git commit hash of core HEAD, or "unknown" if unable to retrieve.
         """
         # Try to get from app-specific instructions repo if it exists
-        core_submodule_path = self.instructions_path / "prometheus-core"
+        core_submodule_path = self.instructions_path / "core"
 
         if (core_submodule_path / ".git").exists():
             revision = self._run_git(["rev-parse", "HEAD"], cwd=core_submodule_path, check=False)
@@ -719,12 +727,13 @@ class InitWorkflow:
         return config_path
 
     def _create_github_symlink(self) -> bool:
-        """Create .github symlink pointing from app code to app-instructions .github.
+        """Create .github symlink pointing from app code to the app-instructions repo root.
 
         In the app code repo (current directory), creates a symlink:
-        ./.github -> ~/.prometheus/{app_name}-instructions/.github
+        ./.github -> ~/.prometheus/{app_name}-instructions/
 
-        This allows the app code repo to reference the workflows and core from app-instructions.
+        This allows the app code repo to reference the full instructions repo
+        (app/ content folders and the core/ submodule) through .github.
 
         Returns:
             True if symlink was created, False if creation failed.
@@ -732,13 +741,10 @@ class InitWorkflow:
         # Ensure base path exists for instructions
         self.base_path.mkdir(parents=True, exist_ok=True)
 
-        instructions_github = self.instructions_path / ".github"
-
-        # Ensure .github folder exists in app-instructions repo
-        # (create it if it doesn't exist)
-        if not instructions_github.exists():
+        # Ensure the instructions repo directory exists
+        if not self.instructions_path.exists():
             try:
-                instructions_github.mkdir(parents=True, exist_ok=True)
+                self.instructions_path.mkdir(parents=True, exist_ok=True)
             except OSError:
                 # If we can't create it, we can't create the symlink
                 return False
@@ -752,7 +758,7 @@ class InitWorkflow:
 
                 shutil.rmtree(symlink_path)
 
-            SymlinkManager.create_symlink(source=instructions_github, target=symlink_path)
+            SymlinkManager.create_symlink(source=self.instructions_path, target=symlink_path)
             return True
         except (OSError, RuntimeError, FileExistsError) as e:
             # Print warning about symlink failure but don't block initialization

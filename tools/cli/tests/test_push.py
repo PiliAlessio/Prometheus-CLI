@@ -11,7 +11,7 @@ def _setup_test_repos(tmp_path):
     """Helper to set up app and instructions repos for testing."""
     app_root = tmp_path / "app"
     instructions_root = tmp_path / "app-instructions"  # Must match {app_name}-instructions
-    core_root = instructions_root / "prometheus-core"
+    core_root = instructions_root / "core"
 
     core_root.mkdir(parents=True)
     app_root.mkdir(parents=True)

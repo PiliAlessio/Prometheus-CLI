@@ -77,10 +77,10 @@ def detect_push_state(start_path: str | Path | None = None) -> PushSummary:
             f"Please run 'prometheus init' first."
         )
 
-    # The instructions repo might have a core submodule at prometheus-core
+    # The instructions repo might have a core submodule at core/
     instructions_state = _inspect_repo(instructions_path, "app-instructions")
     core_state = None
-    core_path = instructions_path / "prometheus-core"
+    core_path = instructions_path / "core"
     if core_path.exists() and (core_path / ".git").exists():
         core_state = _inspect_repo(core_path, "prometheus-core submodule")
 
