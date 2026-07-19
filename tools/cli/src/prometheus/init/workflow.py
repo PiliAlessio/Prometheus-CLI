@@ -716,6 +716,10 @@ class InitWorkflow:
 
         # Check if already a submodule
         if (core_submodule_path / ".git").exists():
+            # Already added - but a previous run may have left core/core/ nested.
+            # Flatten it so existing repos get fixed up too.
+            self._flatten_core_submodule(core_submodule_path)
+            self._cleanup_submodule_folders(core_submodule_path)
             return
 
         try:
@@ -732,6 +736,10 @@ class InitWorkflow:
                 cwd=self.instructions_path,
                 check=False,
             )
+
+            # The Prometheus core repo has its own nested core/ folder; flatten
+            # it so we don't end up with core/core/ inside the submodule.
+            self._flatten_core_submodule(core_submodule_path)
 
             # Remove unnecessary folders to save space (docs and tools/cli)
             self._cleanup_submodule_folders(core_submodule_path)
@@ -758,6 +766,39 @@ class InitWorkflow:
         else:
             # Create new .gitignore with .prometheus.yml
             gitignore_path.write_text(".prometheus.yml\n")
+
+    def _flatten_core_submodule(self, submodule_path: Path) -> None:
+        """Flatten a nested core/ folder from within the core submodule.
+
+        The Prometheus core remote repository has its own top-level core/
+        folder (used by detect_context to identify the main Prometheus repo).
+        Adding that whole repo as a submodule named "core" would otherwise
+        result in core/core/ nesting. This moves the nested core/ content up
+        to the submodule root and removes the now-empty nested folder.
+
+        Args:
+            submodule_path: Path to the core submodule.
+        """
+        nested_core = submodule_path / "core"
+        if not nested_core.is_dir():
+            return
+
+        try:
+            import shutil
+
+            for item in list(nested_core.iterdir()):
+                target = submodule_path / item.name
+                if target.exists():
+                    if target.is_dir() and not target.is_symlink():
+                        shutil.rmtree(target)
+                    else:
+                        target.unlink()
+                shutil.move(str(item), str(target))
+
+            shutil.rmtree(nested_core)
+        except Exception:
+            # Flattening is best-effort - if it fails, the submodule still works
+            pass
 
     def _cleanup_submodule_folders(self, submodule_path: Path) -> None:
         """Remove unnecessary folders from the core submodule to save space.
