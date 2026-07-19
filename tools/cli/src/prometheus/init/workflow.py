@@ -59,13 +59,17 @@ class InitWorkflow:
         self.app_name = app_name
         # Convert repo names to full URLs if needed
         self.app_remote = (
-            self.config.make_github_url(app_remote) if app_remote else None
-        )
+            app_remote if (app_remote.startswith("__CREATE_WITH_GH__") or 
+                          app_remote.startswith("http://") or 
+                          app_remote.startswith("https://"))
+            else self.config.make_github_url(app_remote)
+        ) if app_remote else None
         self.app_instructions_remote = (
-            self.config.make_github_url(app_instructions_remote)
-            if app_instructions_remote
-            else None
-        )
+            app_instructions_remote if (app_instructions_remote.startswith("__CREATE_WITH_GH__") or
+                                       app_instructions_remote.startswith("http://") or
+                                       app_instructions_remote.startswith("https://"))
+            else self.config.make_github_url(app_instructions_remote)
+        ) if app_instructions_remote else None
         self.core_remote = core_remote or DEFAULT_CORE_REPO_URL
         self.create_app_repo = create_app_repo
         self.base_path = Path(base_path or Path.home() / ".prometheus")
