@@ -291,6 +291,9 @@ class InitWorkflow:
 
         # Initialize as git repo
         self._run_git(["init"], cwd=self.app_path)
+        # Ensure the default branch is "main" regardless of the local git version's
+        # init.defaultBranch setting.
+        self._run_git(["symbolic-ref", "HEAD", "refs/heads/main"], cwd=self.app_path, check=False)
 
         # Create .gitignore to exclude .prometheus.yml (local config, not pushed)
         self._create_gitignore()
@@ -317,6 +320,10 @@ class InitWorkflow:
         # If it already exists, just ensure folders are created and push changes
         if instructions_exists:
             print(f"[DEBUG] App-instructions repo already exists at {self.instructions_path}")
+            # Rename a lingering "master" branch to "main" (older/broken checkouts)
+            self._ensure_main_branch(self.instructions_path)
+            # Ensure origin remote is configured (older/broken local repos may lack it)
+            self._ensure_instructions_remote()
             # Detect and optionally clean up an older (pre app/+core/) layout
             self._maybe_clean_legacy_structure()
             # Ensure standard folder structure exists
@@ -373,6 +380,11 @@ class InitWorkflow:
         # User can add origin remote later if desired: git remote add origin <url>
         self.instructions_path.mkdir(parents=True, exist_ok=True)
         self._run_git(["init"], cwd=self.instructions_path)
+        # Ensure the default branch is "main" regardless of the local git version's
+        # init.defaultBranch setting.
+        self._run_git(
+            ["symbolic-ref", "HEAD", "refs/heads/main"], cwd=self.instructions_path, check=False
+        )
         if self.app_instructions_remote:
             # This shouldn't happen (clone succeeded above), but be defensive
             self._run_git(
@@ -391,6 +403,45 @@ class InitWorkflow:
         # Push if remote exists
         if self.app_instructions_remote:
             self._push_instructions_setup()
+
+    def _ensure_main_branch(self, repo_path: Path) -> None:
+        """Rename a lingering 'master' branch to 'main' if present.
+
+        Older or interrupted local checkouts may have been created with git's
+        legacy default branch name. Since all push/pull operations in this
+        tool target "main", rename the branch if needed so pushes succeed.
+        """
+        current_branch = self._run_git(
+            ["rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_path, check=False
+        )
+        if current_branch == "master":
+            print(f"[DEBUG] Renaming branch 'master' to 'main' in {repo_path}")
+            self._run_git(["branch", "-m", "master", "main"], cwd=repo_path, check=False)
+
+    def _ensure_instructions_remote(self) -> None:
+        """Ensure the instructions repo has an 'origin' remote configured.
+
+        Older/broken local checkouts may have been created without a remote
+        (e.g. if a previous clone attempt failed and the tool fell back to a
+        local-only repo). If app_instructions_remote is provided but no origin
+        remote exists yet, add it now so pushes can succeed.
+        """
+        if not self.app_instructions_remote:
+            return
+
+        existing_remotes = self._run_git(
+            ["remote"], cwd=self.instructions_path, check=False
+        )
+        remote_names = (existing_remotes or "").split()
+        if "origin" in remote_names:
+            return
+
+        print(f"[DEBUG] No 'origin' remote found, adding {self.app_instructions_remote}")
+        self._run_git(
+            ["remote", "add", "origin", self.app_instructions_remote],
+            cwd=self.instructions_path,
+            check=False,
+        )
 
     def _maybe_clean_legacy_structure(self) -> None:
         """Detect an older instructions-repo layout and offer to clean it up.
