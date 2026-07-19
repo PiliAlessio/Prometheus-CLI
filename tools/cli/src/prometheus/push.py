@@ -97,7 +97,19 @@ def push_changes(start_path: str | Path | None = None) -> PushSummary:
 
 
 def _inspect_repo(path: Path, name: str) -> RepoPushState:
-    branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=path)
+    # Get branch name - handle empty repos (no HEAD yet)
+    try:
+        branch = _run_git(["rev-parse", "--abbrev-ref", "HEAD"], cwd=path)
+    except RuntimeError:
+        # Empty repo - no HEAD reference yet, use default branch
+        # Try to get the default branch from git config
+        try:
+            branch = _run_git(["config", "--get", "init.defaultBranch"], cwd=path, check=False)
+            if not branch:
+                branch = "main"  # Fallback to "main" as default
+        except Exception:
+            branch = "main"  # Fallback if all else fails
+    
     modified_details = _get_modified_files(path)
     ahead_count = _get_ahead_count(path)
     state = RepoPushState(name=name, path=path, branch=branch, ahead_count=ahead_count)
