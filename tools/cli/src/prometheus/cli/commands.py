@@ -70,9 +70,11 @@ def _create_repo_with_gh(repo_name: str) -> str | None:
         )
 
         if result.returncode != 0:
+            print("[DEBUG] gh command not available")
             return None  # gh not available
 
         # Try to create repo (public, interactive to handle authentication)
+        print(f"[DEBUG] Creating GitHub repository '{repo_name}'...")
         result = subprocess.run(
             ["gh", "repo", "create", repo_name, "--public", "--remote=origin", "--push=false"],
             capture_output=True,
@@ -80,6 +82,10 @@ def _create_repo_with_gh(repo_name: str) -> str | None:
             timeout=30,
             check=False,
         )
+
+        print(f"[DEBUG] gh repo create returned: {result.returncode}")
+        print(f"[DEBUG] gh repo create stdout: {result.stdout}")
+        print(f"[DEBUG] gh repo create stderr: {result.stderr}")
 
         if result.returncode == 0:
             # Get GitHub username and construct the URL
@@ -93,12 +99,16 @@ def _create_repo_with_gh(repo_name: str) -> str | None:
                 )
                 if user_result.returncode == 0:
                     username = user_result.stdout.strip()
-                    return f"https://github.com/{username}/{repo_name}.git"
-            except Exception:
+                    repo_url = f"https://github.com/{username}/{repo_name}.git"
+                    print(f"[DEBUG] Created repo URL: {repo_url}")
+                    return repo_url
+            except Exception as e:
+                print(f"[DEBUG] Error getting username: {e}")
                 pass
 
         return None
-    except Exception:
+    except Exception as e:
+        print(f"[DEBUG] Exception in _create_repo_with_gh: {e}")
         return None
 
 
