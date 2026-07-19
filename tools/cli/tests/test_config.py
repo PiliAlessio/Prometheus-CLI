@@ -20,7 +20,9 @@ class TestConfigGeneration:
 
     def test_config_with_remote(self):
         """Test config includes remote repository."""
-        config = Config(app_name="test", remote_url="https://github.com/user/repo", languages=["go"])
+        config = Config(
+            app_name="test", remote_url="https://github.com/user/repo", languages=["go"]
+        )
         assert config.remote_url == "https://github.com/user/repo"
 
     def test_config_contains_core_version(self):

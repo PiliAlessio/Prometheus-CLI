@@ -114,9 +114,7 @@ def _get_modified_files(path: Path) -> list[ModifiedFile]:
         if status[0] in {"R", "C"} or status[1] in {"R", "C"}:
             next_index = index + 1
             renamed_to = entries[next_index] if next_index < len(entries) else ""
-            display_path = (
-                f"{file_path} -> {renamed_to}" if renamed_to else file_path
-            )
+            display_path = f"{file_path} -> {renamed_to}" if renamed_to else file_path
             index += 2
         else:
             display_path = file_path

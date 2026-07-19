@@ -25,8 +25,7 @@ class TestSubmoduleDetector:
         monkeypatch.setattr(
             "prometheus.submodule.detection._run_git",
             lambda args, cwd, check=False: (
-                " abc123 prometheus-core (heads/main)\n"
-                "-def456 vendor/shared-lib (heads/main)"
+                " abc123 prometheus-core (heads/main)\n" "-def456 vendor/shared-lib (heads/main)"
             ),
         )
 
@@ -55,7 +54,10 @@ class TestSubmoduleDetector:
                 core_root.resolve(),
                 ("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"),
             ): "origin/main",
-            (core_root.resolve(), ("ls-remote", "origin", "refs/heads/main")): "remote-sha\trefs/heads/main",
+            (
+                core_root.resolve(),
+                ("ls-remote", "origin", "refs/heads/main"),
+            ): "remote-sha\trefs/heads/main",
         }
 
         def fake_run_git(args, cwd, check=False):

@@ -22,7 +22,9 @@ class TestUpdateApp:
         responses = {
             (app_root, ("rev-parse", "HEAD")): ["app-before", "app-after"],
             (app_root, ("pull", "--ff-only")): ["Already up to date."],
-            (app_root, ("submodule", "update", "--remote")): ["Submodule path 'prometheus-core': checked out"],
+            (app_root, ("submodule", "update", "--remote")): [
+                "Submodule path 'prometheus-core': checked out"
+            ],
             (core_root, ("rev-parse", "HEAD")): ["core-before", "core-after"],
         }
 
@@ -55,8 +57,12 @@ class TestUpdateApp:
 
         responses = {
             (app_root, ("rev-parse", "HEAD")): ["abc1234", "def5678"],
-            (app_root, ("pull", "--ff-only")): ["Updating abc1234..def5678\nFast-forward\n config/app.yml | 2 +-"],
-            (app_root, ("submodule", "update", "--remote")): ["Submodule path 'prometheus-core': checked out"],
+            (app_root, ("pull", "--ff-only")): [
+                "Updating abc1234..def5678\nFast-forward\n config/app.yml | 2 +-"
+            ],
+            (app_root, ("submodule", "update", "--remote")): [
+                "Submodule path 'prometheus-core': checked out"
+            ],
             (core_root, ("rev-parse", "HEAD")): ["core-old", "core-new"],
         }
 
@@ -89,7 +95,9 @@ class TestUpdateApp:
         responses = {
             (app_root, ("rev-parse", "HEAD")): ["app-same", "app-same"],
             (app_root, ("pull", "--ff-only")): ["Already up to date."],
-            (app_root, ("submodule", "update", "--remote")): ["Submodule path 'prometheus-core': updated from core-old to core-new"],
+            (app_root, ("submodule", "update", "--remote")): [
+                "Submodule path 'prometheus-core': updated from core-old to core-new"
+            ],
             (core_root, ("rev-parse", "HEAD")): ["core-old", "core-new"],
         }
 
@@ -166,7 +174,7 @@ class TestUpdateApp:
         try:
             summary = update_app(app_root)
             # Should either fail or indicate an error in the summary
-            assert hasattr(summary, 'error') or hasattr(summary, 'app_before')
+            assert hasattr(summary, "error") or hasattr(summary, "app_before")
         except RuntimeError as e:
             assert "merge conflict" in str(e).lower() or "pull failed" in str(e).lower()
 
@@ -204,6 +212,6 @@ class TestUpdateApp:
         try:
             summary = update_app(app_root)
             # Should either fail or indicate an error in the summary
-            assert hasattr(summary, 'error') or hasattr(summary, 'app_before')
+            assert hasattr(summary, "error") or hasattr(summary, "app_before")
         except RuntimeError as e:
             assert "detached head" in str(e).lower() or "submodule update failed" in str(e).lower()

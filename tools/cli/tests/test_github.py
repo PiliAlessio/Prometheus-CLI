@@ -43,35 +43,23 @@ class TestGitHubAPIErrorHandling:
 
     def test_network_error_handling(self):
         """Test handling of network errors."""
-        error_response = {
-            "error": "Network error",
-            "message": "Failed to connect to GitHub API"
-        }
+        error_response = {"error": "Network error", "message": "Failed to connect to GitHub API"}
         assert "error" in error_response
         assert error_response["error"] == "Network error"
 
     def test_authentication_error(self):
         """Test handling of authentication errors."""
-        error_response = {
-            "error": "Unauthorized",
-            "status_code": 401
-        }
+        error_response = {"error": "Unauthorized", "status_code": 401}
         assert error_response["status_code"] == 401
 
     def test_rate_limit_error(self):
         """Test handling of rate limit errors."""
-        error_response = {
-            "error": "Rate limit exceeded",
-            "retry_after": 60
-        }
+        error_response = {"error": "Rate limit exceeded", "retry_after": 60}
         assert error_response["retry_after"] == 60
 
     def test_server_error_handling(self):
         """Test handling of server errors."""
-        error_response = {
-            "error": "Server error",
-            "status_code": 500
-        }
+        error_response = {"error": "Server error", "status_code": 500}
         assert error_response["status_code"] >= 500
 
     def test_error_message_contains_details(self):
@@ -79,7 +67,7 @@ class TestGitHubAPIErrorHandling:
         error = {
             "code": "REPO_NOT_FOUND",
             "message": "Repository not found at https://github.com/user/repo",
-            "suggestion": "Check that the URL is correct"
+            "suggestion": "Check that the URL is correct",
         }
         assert "message" in error
         assert len(error["message"]) > 0

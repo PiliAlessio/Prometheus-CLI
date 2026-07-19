@@ -112,11 +112,13 @@ class TestInitWithGitHubMock:
     def test_init_fetches_repo_metadata(self):
         """Test initialization fetches repository metadata."""
         # Create a mock function for fetching metadata
-        fetch_repo_metadata = MagicMock(return_value={
-            "name": "test-repo",
-            "owner": "user",
-            "url": "https://github.com/user/test-repo"
-        })
+        fetch_repo_metadata = MagicMock(
+            return_value={
+                "name": "test-repo",
+                "owner": "user",
+                "url": "https://github.com/user/test-repo",
+            }
+        )
 
         result = fetch_repo_metadata("https://github.com/user/test-repo")
 
@@ -204,7 +206,7 @@ class TestInitWorkflowRemoteValidation:
         from unittest.mock import patch
 
         # Mock git ls-remote for core remote validation
-        with patch('subprocess.run') as mock_run:
+        with patch("subprocess.run") as mock_run:
             # Mock successful git ls-remote for core
             mock_run.return_value = MagicMock(returncode=0, stdout="abc123")
 
@@ -261,9 +263,9 @@ class TestInitWorkflowRemoteValidation:
         """Test that SymlinkManager has all required methods."""
         from prometheus.symlink.symlink import SymlinkManager
 
-        assert hasattr(SymlinkManager, 'create_symlink')
-        assert hasattr(SymlinkManager, 'remove_symlink')
-        assert hasattr(SymlinkManager, 'is_symlink')
+        assert hasattr(SymlinkManager, "create_symlink")
+        assert hasattr(SymlinkManager, "remove_symlink")
+        assert hasattr(SymlinkManager, "is_symlink")
 
         # Methods should be static
         assert callable(SymlinkManager.create_symlink)

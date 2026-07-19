@@ -275,6 +275,8 @@ class TestPushChanges:
         try:
             summary = push_changes(app_root)
             # Should have pushed flag set and error should occur during push
-            assert summary.app.pushed is False or True  # One of them should be true depending on push attempt
+            assert (
+                summary.app.pushed is False or True
+            )  # One of them should be true depending on push attempt
         except RuntimeError as e:
             assert "connection refused" in str(e).lower() or "push failed" in str(e).lower()

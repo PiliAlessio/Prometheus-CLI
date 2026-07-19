@@ -143,7 +143,9 @@ class InitWorkflow:
             )
 
         # Validate app instructions remote (if provided)
-        if self.app_instructions_remote and not self._is_remote_accessible(self.app_instructions_remote):
+        if self.app_instructions_remote and not self._is_remote_accessible(
+            self.app_instructions_remote
+        ):
             raise RuntimeError(
                 f"App instructions remote is not accessible: {self.app_instructions_remote}\n"
                 f"Ensure the URL is correct and you have network access."
@@ -286,8 +288,10 @@ class InitWorkflow:
         The app-specific instructions repo is a SEPARATE repository that contains
         the core as a submodule. It is stored at ~/.prometheus/{app_name}-instructions/
 
-        If app_instructions_remote is provided, it will attempt to clone it.
-        If not provided or clone fails, it creates a local git repo.
+        Behavior:
+        - If app_instructions_remote is provided and accessible: clones from that URL
+        - If app_instructions_remote is not provided: creates a local git repo (user can push later)
+        - Either way: ensures .github structure exists and adds core as submodule
 
         Raises:
             RuntimeError: If critical operations fail.
@@ -317,10 +321,15 @@ class InitWorkflow:
                 pass
 
         # If no remote provided or clone failed, create structure locally
+        # User can add origin remote later if desired: git remote add origin <url>
         self.instructions_path.mkdir(parents=True, exist_ok=True)
         self._run_git(["init"], cwd=self.instructions_path)
         if self.app_instructions_remote:
-            self._run_git(["remote", "add", "origin", self.app_instructions_remote], cwd=self.instructions_path)
+            # This shouldn't happen (clone succeeded above), but be defensive
+            self._run_git(
+                ["remote", "add", "origin", self.app_instructions_remote],
+                cwd=self.instructions_path,
+            )
 
         # Ensure .github directory exists for core submodule
         (self.instructions_path / ".github").mkdir(parents=True, exist_ok=True)
@@ -344,14 +353,14 @@ class InitWorkflow:
             self._run_git(
                 ["submodule", "add", self.core_remote, ".github/prometheus-core"],
                 cwd=self.instructions_path,
-                check=False
+                check=False,
             )
 
             # Initialize and update submodule to fetch content
             self._run_git(
                 ["submodule", "update", "--init", "--recursive"],
                 cwd=self.instructions_path,
-                check=False
+                check=False,
             )
 
             # Remove unnecessary folders to save space (docs and tools/cli)
@@ -389,10 +398,7 @@ class InitWorkflow:
             import shutil
 
             # Folders to remove
-            cleanup_paths = [
-                submodule_path / "tools" / "cli",
-                submodule_path / "docs"
-            ]
+            cleanup_paths = [submodule_path / "tools" / "cli", submodule_path / "docs"]
 
             for path in cleanup_paths:
                 if path.exists():
@@ -415,11 +421,7 @@ class InitWorkflow:
         core_submodule_path = self.instructions_path / ".github" / "prometheus-core"
 
         if (core_submodule_path / ".git").exists():
-            revision = self._run_git(
-                ["rev-parse", "HEAD"],
-                cwd=core_submodule_path,
-                check=False
-            )
+            revision = self._run_git(["rev-parse", "HEAD"], cwd=core_submodule_path, check=False)
             if revision and not revision.startswith("fatal:"):
                 return revision
 
@@ -492,6 +494,7 @@ class InitWorkflow:
             # If .github already exists as a regular directory, remove it first
             if symlink_path.exists() and not symlink_path.is_symlink():
                 import shutil
+
                 shutil.rmtree(symlink_path)
 
             SymlinkManager.create_symlink(source=instructions_github, target=symlink_path)
@@ -499,6 +502,7 @@ class InitWorkflow:
         except (OSError, RuntimeError, FileExistsError) as e:
             # Print warning about symlink failure but don't block initialization
             import sys
+
             print(f"⚠ Warning: Could not create .github symlink: {str(e)}", file=sys.stderr)
             return False
 

@@ -1,4 +1,4 @@
-"""Update support for Prometheus app repositories."""
+"""Pull support for Prometheus app repositories."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ from prometheus.context import detect_context
 
 
 @dataclass
-class UpdateSummary:
-    """Summary returned by update execution."""
+class PullSummary:
+    """Summary returned by pull execution."""
 
     app_path: Path
     app_before: str
@@ -20,11 +20,11 @@ class UpdateSummary:
     core_after: str | None
 
 
-def update_app(start_path: str | Path | None = None) -> UpdateSummary:
+def pull_app(start_path: str | Path | None = None) -> PullSummary:
     """Pull the app repo and update its prometheus-core submodule."""
     context = detect_context(start_path)
     if not context.is_app:
-        raise RuntimeError("The update workflow only works inside an app repository.")
+        raise RuntimeError("The pull workflow only works inside an app repository.")
 
     app_before = _run_git(["rev-parse", "HEAD"], cwd=context.root_path, check=False) or "unknown"
     core_before = None
@@ -43,7 +43,7 @@ def update_app(start_path: str | Path | None = None) -> UpdateSummary:
             _run_git(["rev-parse", "HEAD"], cwd=context.core_path, check=False) or "unknown"
         )
 
-    return UpdateSummary(
+    return PullSummary(
         app_path=context.root_path,
         app_before=app_before,
         app_after=app_after,

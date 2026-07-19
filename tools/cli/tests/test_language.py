@@ -41,21 +41,17 @@ class TestLanguageDetection:
             ".py": "python",
             ".rs": "rust",
             ".js": "javascript",
-            ".ts": "typescript"
+            ".ts": "typescript",
         }
-        
+
         for ext, lang in extensions.items():
             assert ext.startswith(".")
             assert len(lang) > 0
 
     def test_detect_from_filename(self):
         """Test detecting language from filename."""
-        files = {
-            "main.go": "go",
-            "app.py": "python",
-            "main.rs": "rust"
-        }
-        
+        files = {"main.go": "go", "app.py": "python", "main.rs": "rust"}
+
         for filename, expected_lang in files.items():
             assert "." in filename
             ext = filename.split(".")[-1]
