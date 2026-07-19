@@ -111,7 +111,7 @@ class InitWorkflow:
         # Phase 5: Create configuration file
         config_path = self._create_config_file(core_version)
 
-        # Phase 6: Create .github symlink in app code
+        # Phase 6: Create .github/prometheus symlink in app code
         symlink_created = self._create_github_symlink()
 
         return InitResult(
@@ -272,7 +272,8 @@ class InitWorkflow:
         """Create app repository structure locally for new apps.
 
         The app code repo is minimal, containing only config and other app files.
-        The .github folder will be created as a symlink to app-instructions/.github
+        The .github/prometheus folder will be created as a symlink to the
+        app-instructions repo root.
 
         Raises:
             FileExistsError: If app directory already has content.
@@ -880,13 +881,16 @@ class InitWorkflow:
         return config_path
 
     def _create_github_symlink(self) -> bool:
-        """Create .github symlink pointing from app code to the app-instructions repo root.
+        """Create .github/prometheus symlink pointing to the app-instructions repo root.
 
         In the app code repo (current directory), creates a symlink:
-        ./.github -> ~/.prometheus/{app_name}-instructions/
+        ./.github/prometheus -> ~/.prometheus/{app_name}-instructions/
 
+        The "prometheus" layer only exists in the app code repo - the
+        instructions repo itself stays flat (app/ and core/ at its root).
         This allows the app code repo to reference the full instructions repo
-        (app/ content folders and the core/ submodule) through .github.
+        (app/ content folders and the core/ submodule) through
+        .github/prometheus/app and .github/prometheus/core.
 
         Returns:
             True if symlink was created, False if creation failed.
@@ -902,10 +906,18 @@ class InitWorkflow:
                 # If we can't create it, we can't create the symlink
                 return False
 
-        symlink_path = self.app_path / ".github"
+        github_path = self.app_path / ".github"
 
         try:
-            # If .github already exists as a regular directory, remove it first
+            # .github is a real directory in the app repo; if it previously was
+            # a symlink itself (older layout), remove it and recreate as a dir.
+            if github_path.is_symlink():
+                github_path.unlink()
+            github_path.mkdir(parents=True, exist_ok=True)
+
+            symlink_path = github_path / "prometheus"
+
+            # If prometheus already exists as a regular directory, remove it first
             if symlink_path.exists() and not symlink_path.is_symlink():
                 import shutil
 
@@ -917,7 +929,10 @@ class InitWorkflow:
             # Print warning about symlink failure but don't block initialization
             import sys
 
-            print(f"⚠ Warning: Could not create .github symlink: {str(e)}", file=sys.stderr)
+            print(
+                f"⚠ Warning: Could not create .github/prometheus symlink: {str(e)}",
+                file=sys.stderr,
+            )
             return False
 
     def _run_git(self, args: list[str], cwd: str | Path, check: bool = True) -> str:

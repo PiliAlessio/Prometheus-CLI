@@ -152,7 +152,8 @@ def init(app_name, app_remote, app_instructions_remote, core_remote, create_app_
     The workflow:
     - Validates all three remotes are accessible
     - Stores remote URLs in .prometheus.yml (local only, not pushed)
-    - Creates .github symlink in app code pointing to app's GitHub folder
+    - Creates .github/prometheus symlink in app code pointing to the
+      app-instructions repo (app/ and core/)
     - Sets up core as submodule in app-specific instructions repo
 
     Examples:
@@ -224,9 +225,12 @@ def init(app_name, app_remote, app_instructions_remote, core_remote, create_app_
     click.echo(f"  Core remote: {result.core_remote}")
     click.echo(f"  Core version: {result.core_version}")
     if result.symlink_created:
-        click.echo(f"  Symlink: ./.github -> {result.app_path}/.github")
+        click.echo(f"  Symlink: ./.github/prometheus -> ~/.prometheus/{app_name}-instructions")
     else:
-        click.echo("  ⚠ .github symlink not created (may require admin " "privileges on Windows)")
+        click.echo(
+            "  \u26a0 .github/prometheus symlink not created (may require admin "
+            "privileges on Windows)"
+        )
     click.echo("[OK] Setup complete!")
 
 
