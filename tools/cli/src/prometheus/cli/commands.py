@@ -109,6 +109,17 @@ def init(app_name, app_remote, app_instructions_remote, core_remote, create_app_
             or None
         )
 
+        # If empty, offer to create on GitHub using gh CLI
+        if not app_instructions_remote:
+            if click.confirm("  Create on GitHub using gh CLI? (requires GitHub CLI)"):
+                gh_repo_name = click.prompt(
+                    "  Repository name (e.g., my-app-instructions)",
+                    default=f"{app_name}-instructions",
+                    type=str,
+                ).strip()
+                # The InitWorkflow will attempt gh creation
+                app_instructions_remote = f"__CREATE_WITH_GH__{gh_repo_name}"
+
     workflow = InitWorkflow(
         app_name=app_name,
         app_remote=app_remote,

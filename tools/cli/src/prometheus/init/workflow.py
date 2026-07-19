@@ -290,7 +290,9 @@ class InitWorkflow:
 
         Behavior:
         - If app_instructions_remote is provided and accessible: clones from that URL
-        - If app_instructions_remote is not provided: creates a local git repo (user can push later)
+        - If app_instructions_remote starts with __CREATE_WITH_GH__: tries GitHub CLI
+        - If app_instructions_remote is not provided: creates a local git repo
+          (user can push later)
         - Either way: ensures .github structure exists and adds core as submodule
 
         Raises:
@@ -300,11 +302,43 @@ class InitWorkflow:
         if (self.instructions_path / ".git").exists():
             return
 
+        # Check if this is a GitHub CLI creation request
+        if self.app_instructions_remote and self.app_instructions_remote.startswith(
+            "__CREATE_WITH_GH__"
+        ):
+            repo_name = self.app_instructions_remote.replace("__CREATE_WITH_GH__", "").strip()
+            # Create local repo first
+            self.instructions_path.mkdir(parents=True, exist_ok=True)
+            self._run_git(["init"], cwd=self.instructions_path)
+
+            # Try to create on GitHub
+            gh_url = self._try_create_repo_with_gh(repo_name)
+            if gh_url:
+                self.app_instructions_remote = gh_url
+                self._run_git(
+                    ["remote", "add", "origin", gh_url],
+                    cwd=self.instructions_path,
+                )
+            else:
+                # gh failed or not available, continue with local-only
+                self.app_instructions_remote = None
+
+            # Ensure .github directory exists for core submodule
+            (self.instructions_path / ".github").mkdir(parents=True, exist_ok=True)
+            # Add core as submodule in the app instructions repo
+            self._add_core_submodule_to_instructions()
+            return
+
         # Try to clone app instructions repo if a remote was provided
         if self.app_instructions_remote:
             try:
                 result = subprocess.run(
-                    ["git", "clone", self.app_instructions_remote, str(self.instructions_path)],
+                    [
+                        "git",
+                        "clone",
+                        self.app_instructions_remote,
+                        str(self.instructions_path),
+                    ],
                     capture_output=True,
                     text=True,
                     check=False,
@@ -336,6 +370,75 @@ class InitWorkflow:
 
         # Add core as submodule in the app instructions repo
         self._add_core_submodule_to_instructions()
+
+    def _try_create_repo_with_gh(self, repo_name: str) -> str | None:
+        """Attempt to create a GitHub repository using GitHub CLI.
+
+        Args:
+            repo_name: Name for the repository (e.g., 'my-app-instructions')
+
+        Returns:
+            Repository HTTPS URL if created successfully, None if gh unavailable
+            or creation failed. Falls back gracefully.
+        """
+        try:
+            # Check if gh command is available
+            result = subprocess.run(
+                ["gh", "--version"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
+            )
+
+            if result.returncode != 0:
+                return None  # gh not available
+
+            # Try to create repo
+            result = subprocess.run(
+                [
+                    "gh",
+                    "repo",
+                    "create",
+                    repo_name,
+                    "--public",
+                    "--source=.",
+                    "--remote=origin",
+                    "--push=false",
+                ],
+                cwd=self.instructions_path,
+                capture_output=True,
+                text=True,
+                timeout=30,
+                check=False,
+            )
+
+            if result.returncode == 0:
+                # Extract repo URL from gh output or construct it
+                # gh outputs: "✓ Created repository {owner}/{repo} on GitHub"
+                # We need to construct the HTTPS URL
+                try:
+                    # Get GitHub username if not in output
+                    user_result = subprocess.run(
+                        ["gh", "api", "user", "-q", ".login"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                        check=False,
+                    )
+                    if user_result.returncode == 0:
+                        username = user_result.stdout.strip()
+                        repo_url = f"https://github.com/{username}/{repo_name}.git"
+                        return repo_url
+                except Exception:
+                    pass
+
+            return None
+
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return None
+        except Exception:
+            return None
 
     def _add_core_submodule_to_instructions(self) -> None:
         """Add core as a submodule in the app-specific instructions repository.
