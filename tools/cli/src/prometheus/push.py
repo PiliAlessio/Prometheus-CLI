@@ -109,7 +109,7 @@ def _inspect_repo(path: Path, name: str) -> RepoPushState:
                 branch = "main"  # Fallback to "main" as default
         except Exception:
             branch = "main"  # Fallback if all else fails
-    
+
     modified_details = _get_modified_files(path)
     ahead_count = _get_ahead_count(path)
     state = RepoPushState(name=name, path=path, branch=branch, ahead_count=ahead_count)
