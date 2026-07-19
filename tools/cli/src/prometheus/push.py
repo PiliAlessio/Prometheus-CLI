@@ -83,14 +83,27 @@ def _inspect_repo(path: Path, name: str) -> RepoPushState:
 
 def _push_repo(state: RepoPushState) -> RepoPushState:
     if state.modified_files:
-        state.skipped_reason = "has uncommitted changes"
-        return state
+        # Add and commit modified files before pushing
+        try:
+            print(f"[DEBUG] Adding and committing {len(state.modified_files)} modified files in {state.name}...")
+            _run_git(["add", "-A"], cwd=state.path)
+            _run_git(
+                ["commit", "-m", f"Update: Changes from {state.name} repository"],
+                cwd=state.path,
+            )
+            state.modified_files = []  # Clear modified files list since we committed
+            # Recalculate ahead_count after committing
+            state.ahead_count = _get_ahead_count(state.path)
+        except RuntimeError as e:
+            state.skipped_reason = f"failed to commit changes: {e}"
+            return state
 
     if state.ahead_count <= 0:
         state.skipped_reason = "no commits to push"
         return state
 
-    _run_git(["push"], cwd=state.path)
+    # Use -u flag to set up upstream tracking for new branches
+    _run_git(["push", "-u", "origin", state.branch], cwd=state.path)
     state.pushed = True
     return state
 
