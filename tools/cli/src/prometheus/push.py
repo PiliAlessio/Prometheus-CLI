@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from prometheus.config import Config
 from prometheus.context import detect_context
 
 
@@ -49,21 +51,44 @@ class PushSummary:
 
 
 def detect_push_state(start_path: str | Path | None = None) -> PushSummary:
-    """Detect app/core repository state before attempting a push."""
+    """Detect app-instructions repository state before attempting a push."""
     context = detect_context(start_path)
     if not context.is_app:
         raise RuntimeError("The --push workflow only works inside an app repository.")
 
-    app_state = _inspect_repo(context.root_path, "app repo")
-    core_state = None
-    if context.core_path and (context.core_path / ".git").exists():
-        core_state = _inspect_repo(context.core_path, "prometheus-core submodule")
+    # Load config to get app_name
+    config = Config.from_file(context.config_path)
+    if not config.app_name:
+        raise RuntimeError(
+            "app_name not found in .prometheus.yml. Unable to locate app-instructions repo."
+        )
 
-    return PushSummary(app=app_state, core=core_state)
+    # Determine instructions repo path: ~/.prometheus/{app_name}-instructions
+    # Allow override via PROMETHEUS_INSTRUCTIONS_BASE environment variable (for testing)
+    base_path = os.environ.get("PROMETHEUS_INSTRUCTIONS_BASE")
+    if base_path:
+        instructions_path = Path(base_path) / f"{config.app_name}-instructions"
+    else:
+        instructions_path = Path.home() / ".prometheus" / f"{config.app_name}-instructions"
+
+    if not instructions_path.exists():
+        raise RuntimeError(
+            f"App-instructions repository not found at {instructions_path}. "
+            f"Please run 'prometheus init' first."
+        )
+
+    # The instructions repo might have a core submodule at .github/prometheus-core
+    instructions_state = _inspect_repo(instructions_path, "app-instructions")
+    core_state = None
+    core_path = instructions_path / ".github" / "prometheus-core"
+    if core_path.exists() and (core_path / ".git").exists():
+        core_state = _inspect_repo(core_path, "prometheus-core submodule")
+
+    return PushSummary(app=instructions_state, core=core_state)
 
 
 def push_changes(start_path: str | Path | None = None) -> PushSummary:
-    """Push the app repo and its core submodule when commits are ready."""
+    """Push changes to app-instructions repository and its core submodule."""
     summary = detect_push_state(start_path)
     _push_repo(summary.app)
     if summary.core:
