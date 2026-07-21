@@ -145,6 +145,9 @@ def materialize(instructions_path: Path, app_path: Path) -> MaterializeResult:
 
         _materialize_helpers(source_root / _HELPERS_KIND, app_path, prefix, result)
 
+    # Also materialize helpers from core/ root (at the submodule root level)
+    _materialize_helpers(instructions_path / "core" / _HELPERS_KIND, app_path, "core.", result)
+
     _materialize_layered_source(instructions_path / _LAYERED_SOURCE, app_path, result)
 
     return result

@@ -131,6 +131,24 @@ class TestMaterialize:
         assert core_helper.read_text(encoding="utf-8") == "print('core helper')\n"
         assert backend_helper.read_text(encoding="utf-8") == "print('backend helper')\n"
 
+    def test_materializes_helpers_from_core_root(self, tmp_path):
+        """Test that helpers from core/ root (submodule root level) are materialized."""
+        instructions_path = tmp_path / "app-instructions"
+        app_path = tmp_path / "app"
+
+        _write(
+            instructions_path / "core" / "helpers" / "setup.ps1",
+            "$PSVersionTable\n",
+        )
+
+        result = materialize(instructions_path, app_path)
+
+        assert result.written_count == 1
+
+        core_root_helper = app_path / ".github" / "helpers" / "core.setup.ps1"
+        assert core_root_helper.exists()
+        assert core_root_helper.read_text(encoding="utf-8") == "$PSVersionTable\n"
+
     def test_fills_in_missing_required_frontmatter(self, tmp_path):
         instructions_path = tmp_path / "app-instructions"
         app_path = tmp_path / "app"
