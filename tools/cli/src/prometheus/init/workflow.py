@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from prometheus.config import Config
-from prometheus.symlink.symlink import SymlinkManager
+from prometheus.materialize.materialize import materialize
 
 DEFAULT_CORE_REPO_URL = "https://github.com/AlessioPili-KT/Prometheus.git"
 
@@ -22,7 +22,7 @@ class InitResult:
     app_instructions_remote: str | None
     core_remote: str
     core_version: str
-    symlink_created: bool
+    materialized_files: int = 0
 
 
 class InitWorkflow:
@@ -55,7 +55,7 @@ class InitWorkflow:
             core_remote: Remote URL for core instructions repo
             create_app_repo: If True, create app repo structure locally for new apps
             base_path: Where to store app repos (~/.prometheus by default)
-            current_dir: Current working directory for symlink creation
+            current_dir: Current working directory for the app code repo
         """
         self.config = Config()
         self.app_name = app_name
@@ -111,8 +111,13 @@ class InitWorkflow:
         # Phase 5: Create configuration file
         config_path = self._create_config_file(core_version)
 
-        # Phase 6: Create .github/prometheus symlink in app code
-        symlink_created = self._create_github_symlink()
+        # Phase 6: Materialize domain/core/code content directly into native
+        # .github/instructions|prompts|agents|skills locations in the app
+        # code repo. There is no longer a .github/prometheus symlink into the
+        # cached app-instructions repo - the materialized copies are the only
+        # thing that ends up in the app repo's .github folder, and
+        # _create_gitignore() ensures none of it is ever committed there.
+        materialize_result = materialize(self.instructions_path, self.app_path)
 
         return InitResult(
             app_path=self.app_path,
@@ -121,7 +126,7 @@ class InitWorkflow:
             app_instructions_remote=self.app_instructions_remote,
             core_remote=self.core_remote,
             core_version=core_version,
-            symlink_created=symlink_created,
+            materialized_files=materialize_result.written_count,
         )
 
     def _validate_remotes(self) -> None:
@@ -271,9 +276,10 @@ class InitWorkflow:
     def _create_app_structure_locally(self) -> None:
         """Create app repository structure locally for new apps.
 
-        The app code repo is minimal, containing only config and other app files.
-        The .github/prometheus folder will be created as a symlink to the
-        app-instructions repo root.
+        The app code repo is minimal, containing only config and other app
+        files. The .github/instructions|prompts|agents|skills folders are
+        populated later by materializing content from the app-instructions
+        repo - they are never a symlink or submodule.
 
         Raises:
             FileExistsError: If app directory already has content.
@@ -287,7 +293,7 @@ class InitWorkflow:
         # Create app code directory (may already exist if using current_dir)
         self.app_path.mkdir(parents=True, exist_ok=True)
 
-        # Create only config folder (not .github - that will be a symlink)
+        # Create only config folder
         (self.app_path / "config").mkdir(parents=True, exist_ok=True)
 
         # Initialize as git repo
@@ -773,24 +779,41 @@ class InitWorkflow:
             # If submodule add fails, that's ok - the domain/ folder structure was created
             pass
 
+    # Materialized content folders in the app code repo's .github/ that are
+    # local copies rebuilt from the app-instructions repo on every
+    # init/pull/update - never the app repo's own content, so they must
+    # never be committed/pushed from the app code repo.
+    _MATERIALIZED_GITIGNORE_ENTRIES = (
+        ".github/instructions/",
+        ".github/prompts/",
+        ".github/agents/",
+        ".github/skills/",
+    )
+
     def _create_gitignore(self) -> None:
         """Create .gitignore files in app repo.
 
-        App repo: excludes .prometheus.yml (local config)
+        App repo: excludes .prometheus.yml (local config) and the
+        materialized .github/instructions|prompts|agents|skills folders
+        (local copies rebuilt from the app-instructions repo, not app repo
+        content).
         Instructions repo: no gitignore needed (contains tracked content folders and core submodule)
         """
         # App code repo .gitignore
         gitignore_path = self.app_path / ".gitignore"
 
-        # If .gitignore already exists, just ensure .prometheus.yml is in it
+        entries = [".prometheus.yml", *self._MATERIALIZED_GITIGNORE_ENTRIES]
+
         if gitignore_path.exists():
             content = gitignore_path.read_text()
-            if ".prometheus.yml" not in content:
+            missing = [entry for entry in entries if entry not in content]
+            if missing:
                 with open(gitignore_path, "a") as f:
-                    f.write("\n.prometheus.yml\n")
+                    if not content.endswith("\n"):
+                        f.write("\n")
+                    f.write("\n".join(missing) + "\n")
         else:
-            # Create new .gitignore with .prometheus.yml
-            gitignore_path.write_text(".prometheus.yml\n")
+            gitignore_path.write_text("\n".join(entries) + "\n")
 
     def _repair_legacy_submodule_deletions(self, submodule_path: Path) -> None:
         """Restore tools/cli/ and docs/ if a previous CLI version deleted them.
@@ -912,61 +935,6 @@ class InitWorkflow:
         config_path = self.app_path / ".prometheus.yml"
         config.save(config_path)
         return config_path
-
-    def _create_github_symlink(self) -> bool:
-        """Create .github/prometheus symlink pointing to the app-instructions repo root.
-
-        In the app code repo (current directory), creates a symlink:
-        ./.github/prometheus -> ~/.prometheus/{app_name}-instructions/
-
-        The "prometheus" layer only exists in the app code repo - the
-        instructions repo itself stays flat (domain/ and core/ at its root).
-        This allows the app code repo to reference the full instructions repo
-        (domain/ content folders and the core/ submodule) through
-        .github/prometheus/domain and .github/prometheus/core.
-
-        Returns:
-            True if symlink was created, False if creation failed.
-        """
-        # Ensure base path exists for instructions
-        self.base_path.mkdir(parents=True, exist_ok=True)
-
-        # Ensure the instructions repo directory exists
-        if not self.instructions_path.exists():
-            try:
-                self.instructions_path.mkdir(parents=True, exist_ok=True)
-            except OSError:
-                # If we can't create it, we can't create the symlink
-                return False
-
-        github_path = self.app_path / ".github"
-
-        try:
-            # .github is a real directory in the app repo; if it previously was
-            # a symlink itself (older layout), remove it and recreate as a dir.
-            if github_path.is_symlink():
-                github_path.unlink()
-            github_path.mkdir(parents=True, exist_ok=True)
-
-            symlink_path = github_path / "prometheus"
-
-            # If prometheus already exists as a regular directory, remove it first
-            if symlink_path.exists() and not symlink_path.is_symlink():
-                import shutil
-
-                shutil.rmtree(symlink_path)
-
-            SymlinkManager.create_symlink(source=self.instructions_path, target=symlink_path)
-            return True
-        except (OSError, RuntimeError, FileExistsError) as e:
-            # Print warning about symlink failure but don't block initialization
-            import sys
-
-            print(
-                f"⚠ Warning: Could not create .github/prometheus symlink: {str(e)}",
-                file=sys.stderr,
-            )
-            return False
 
     def _run_git(self, args: list[str], cwd: str | Path, check: bool = True) -> str:
         """Run a git command.

@@ -228,7 +228,8 @@ class TestInitWorkflowRemoteValidation:
             app_path = temp_project_dir
             assert app_path.exists()
             assert (app_path / "config").exists()
-            # .github is not created here; it will be a symlink to app-instructions/.github
+            # .github is not created here; its content is populated later by
+            # materializing files from the app-instructions repo (no symlink).
             # Instructions repo is separate in the base path
             instructions_path = temp_project_dir / "new-app-instructions"
             assert not instructions_path.exists()  # Not created yet in local structure

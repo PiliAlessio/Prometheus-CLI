@@ -19,7 +19,6 @@ class TestInitCommand:
             app_instructions_remote=None,
             core_remote="https://github.com/AlessioPili-KT/Prometheus.git",
             core_version="abc123",
-            symlink_created=True,
         )
         monkeypatch.setattr("prometheus.cli.commands.InitWorkflow.run", lambda self: init_result)
 

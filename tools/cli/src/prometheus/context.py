@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from prometheus.config import Config
+
 APP_CONFIG_FILE = ".prometheus.yml"
-CORE_SUBMODULE_DIR = ".github/prometheus/core"
+INSTRUCTIONS_BASE_ENV_VAR = "PROMETHEUS_INSTRUCTIONS_BASE"
 
 
 @dataclass(frozen=True)
@@ -41,7 +44,7 @@ def detect_context(start_path: str | Path | None = None) -> ExecutionContext:
                 context_type="app",
                 root_path=candidate,
                 config_path=config_path,
-                core_path=candidate / CORE_SUBMODULE_DIR,
+                core_path=_detect_core_path(config_path),
             )
 
     for candidate in search_roots:
@@ -53,3 +56,27 @@ def detect_context(start_path: str | Path | None = None) -> ExecutionContext:
             )
 
     return ExecutionContext(context_type="unknown", root_path=current_path)
+
+
+def _detect_core_path(config_path: Path) -> Path | None:
+    """Locate the core submodule inside the cached app-instructions repo.
+
+    The app-instructions repo (and its core/ submodule) live outside the app
+    code repo, cached at ~/.prometheus/{app_name}-instructions/ (or under
+    PROMETHEUS_INSTRUCTIONS_BASE when overridden for testing). There is no
+    longer a .github/prometheus symlink into the app code repo pointing at
+    it - materialized content is copied directly into the app repo's
+    .github/ folder instead, so this path is only used to locate the source
+    repo for pull/update/push operations.
+    """
+    try:
+        config = Config.from_file(config_path)
+    except (FileNotFoundError, OSError):
+        return None
+
+    if not config.app_name:
+        return None
+
+    base_path = os.environ.get(INSTRUCTIONS_BASE_ENV_VAR)
+    base = Path(base_path) if base_path else Path.home() / ".prometheus"
+    return base / f"{config.app_name}-instructions" / "core"

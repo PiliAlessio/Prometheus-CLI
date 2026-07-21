@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from prometheus.context import detect_context
+from prometheus.materialize.materialize import materialize
 
 
 @dataclass
@@ -18,6 +19,7 @@ class PullSummary:
     app_after: str
     core_before: str | None
     core_after: str | None
+    materialized_files: int = 0
 
 
 def pull_app(start_path: str | Path | None = None) -> PullSummary:
@@ -35,9 +37,9 @@ def pull_app(start_path: str | Path | None = None) -> PullSummary:
 
     _run_git(["pull", "--ff-only"], cwd=context.root_path)
 
-    # The core submodule is registered in .gitmodules of the repository that
-    # added it (the app-instructions repo, reached here via the
-    # .github/prometheus symlink) - NOT the app code repo itself. Running
+    # The core submodule is registered in .gitmodules of the app-instructions
+    # repo (cached at ~/.prometheus/{app_name}-instructions/, resolved via
+    # context.core_path) - NOT the app code repo itself. Running
     # `submodule update` with cwd=root_path silently no-ops because root_path
     # has no .gitmodules of its own.
     if context.core_path:
@@ -62,12 +64,18 @@ def pull_app(start_path: str | Path | None = None) -> PullSummary:
             _run_git(["rev-parse", "HEAD"], cwd=context.core_path, check=False) or "unknown"
         )
 
+    materialized_files = 0
+    if context.core_path:
+        materialize_result = materialize(context.core_path.parent, context.root_path)
+        materialized_files = materialize_result.written_count
+
     return PullSummary(
         app_path=context.root_path,
         app_before=app_before,
         app_after=app_after,
         core_before=core_before,
         core_after=core_after,
+        materialized_files=materialized_files,
     )
 
 

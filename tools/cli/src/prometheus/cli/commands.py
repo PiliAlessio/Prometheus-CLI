@@ -154,9 +154,11 @@ def init(app_name, app_remote, app_instructions_remote, core_remote, create_app_
     The workflow:
     - Validates all three remotes are accessible
     - Stores remote URLs in .prometheus.yml (local only, not pushed)
-    - Creates .github/prometheus symlink in app code pointing to the
-      app-instructions repo (domain/ and core/)
-    - Sets up core as submodule in app-specific instructions repo
+    - Materializes domain/core content directly into
+      .github/instructions|prompts|agents|skills in the app code repo
+      (these folders are gitignored - the app code repo is never the
+      source of truth for them)
+    - Sets up core as submodule in app-specific instructions repository
 
     Examples:
         prometheus init --app-name my-app \\
@@ -226,12 +228,10 @@ def init(app_name, app_remote, app_instructions_remote, core_remote, create_app_
         )
     click.echo(f"  Core remote: {result.core_remote}")
     click.echo(f"  Core version: {result.core_version}")
-    if result.symlink_created:
-        click.echo(f"  Symlink: ./.github/prometheus -> ~/.prometheus/{app_name}-instructions")
-    else:
+    if result.materialized_files:
         click.echo(
-            "  \u26a0 .github/prometheus symlink not created (may require admin "
-            "privileges on Windows)"
+            f"  Materialized {result.materialized_files} file(s) into "
+            ".github/instructions|prompts|agents|skills"
         )
     click.echo("[OK] Setup complete!")
 
@@ -255,6 +255,8 @@ def pull():
     click.echo(f"  App revision: {summary.app_before} -> {summary.app_after}")
     if summary.core_before or summary.core_after:
         click.echo(f"  Core revision: {summary.core_before} -> {summary.core_after}")
+    if summary.materialized_files:
+        click.echo(f"  Materialized {summary.materialized_files} file(s)")
     click.echo("[OK] Pull completed successfully.")
 
 
@@ -277,6 +279,8 @@ def sync():
         click.echo(f"  App revision: {pull_summary.app_before} -> {pull_summary.app_after}")
         if pull_summary.core_before or pull_summary.core_after:
             click.echo(f"  Core revision: {pull_summary.core_before} -> {pull_summary.core_after}")
+        if pull_summary.materialized_files:
+            click.echo(f"  Materialized {pull_summary.materialized_files} file(s)")
 
         push_summary = push_changes(Path.cwd())
         click.echo("✓ Pushed changes:")
