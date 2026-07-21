@@ -33,7 +33,7 @@ class TestMaterialize:
             "No frontmatter here, just a prompt body.\n",
         )
         _write(
-            instructions_path / "core" / "code_instructions" / "skills" / "helper.md",
+            instructions_path / "core" / "code_instructions" / "backend" / "skills" / "helper.md",
             "---\nname: helper\n---\n\nSkill body.\n",
         )
 
@@ -43,11 +43,59 @@ class TestMaterialize:
 
         domain_file = app_path / ".github" / "instructions" / "domain.style.md"
         core_file = app_path / ".github" / "prompts" / "core.review.md"
-        code_file = app_path / ".github" / "skills" / "code.helper.md"
+        code_file = app_path / ".github" / "skills" / "backend_helper.skills.md"
 
         assert domain_file.exists()
         assert core_file.exists()
         assert code_file.exists()
+
+    def test_materializes_code_instructions_layers_with_layer_naming(self, tmp_path):
+        instructions_path = tmp_path / "app-instructions"
+        app_path = tmp_path / "app"
+
+        _write(
+            instructions_path
+            / "core"
+            / "code_instructions"
+            / "backend"
+            / "instructions"
+            / "style.md",
+            "---\ndescription: Backend style\n---\n\nBackend body.\n",
+        )
+        _write(
+            instructions_path
+            / "core"
+            / "code_instructions"
+            / "frontend"
+            / "instructions"
+            / "style.md",
+            "---\ndescription: Frontend style\n---\n\nFrontend body.\n",
+        )
+        _write(
+            instructions_path
+            / "core"
+            / "code_instructions"
+            / "backend"
+            / "prompts"
+            / "review.md",
+            "Backend prompt body.\n",
+        )
+
+        result = materialize(instructions_path, app_path)
+
+        assert result.written_count == 3
+
+        backend_instructions = (
+            app_path / ".github" / "instructions" / "backend_style.instructions.md"
+        )
+        frontend_instructions = (
+            app_path / ".github" / "instructions" / "frontend_style.instructions.md"
+        )
+        backend_prompt = app_path / ".github" / "prompts" / "backend_review.prompts.md"
+
+        assert backend_instructions.exists()
+        assert frontend_instructions.exists()
+        assert backend_prompt.exists()
 
     def test_fills_in_missing_required_frontmatter(self, tmp_path):
         instructions_path = tmp_path / "app-instructions"

@@ -10,9 +10,18 @@ that single native location by itself.
 
 This module copies the markdown content from those source trees into the
 app repository's ``.github/instructions|prompts|agents|skills`` folders,
-renaming each file with a ``domain.``, ``core.`` or ``code.`` prefix (based on
-its source) so files from different origins never collide, and ensuring each
+renaming each file with a ``domain.`` or ``core.`` prefix (based on its
+source) so files from different origins never collide, and ensuring each
 materialized file carries the minimum frontmatter VS Code expects.
+
+``core/code_instructions`` is organized differently: it has no content
+folders of its own, only per-stack layer folders (e.g. ``backend/``,
+``frontend/``), each containing the usual
+``instructions|prompts|agents|skills`` structure. Files found there are
+materialized using the layer folder's name as the naming pattern instead of
+a fixed prefix - e.g. ``backend/instructions/foo.md`` becomes
+``.github/instructions/backend_foo.instructions.md`` - so files from
+different stack layers never collide and their origin stays obvious.
 
 Each materialized destination folder is fully cleared and rebuilt on every
 run, so the app repo's ``.github/`` content always mirrors the current
@@ -42,8 +51,14 @@ import yaml
 _SOURCE_PREFIXES: dict[str, str] = {
     "domain": "domain.",
     "core/core": "core.",
-    "core/code_instructions": "code.",
 }
+
+# core/code_instructions has no content folders of its own - it only has
+# per-stack layer folders (e.g. backend/, frontend/), each containing the
+# usual instructions|prompts|agents|skills structure. Materialized as
+# <layer>_<filename>.<kind>.md instead of a fixed prefix, so files from
+# different layers never collide.
+_LAYERED_SOURCE = "core/code_instructions"
 
 # Content subfolders copied into the matching .github/<kind> destination.
 _CONTENT_KINDS = ("instructions", "prompts", "agents", "skills")
@@ -111,7 +126,48 @@ def materialize(instructions_path: Path, app_path: Path) -> MaterializeResult:
                 dest_file.write_text(content, encoding="utf-8")
                 result.written.append(dest_file)
 
+    _materialize_layered_source(instructions_path / _LAYERED_SOURCE, app_path, result)
+
     return result
+
+
+def _materialize_layered_source(
+    source_root: Path, app_path: Path, result: MaterializeResult
+) -> None:
+    """Materialize a per-stack-layer source tree (e.g. core/code_instructions).
+
+    Unlike the flat sources handled in `materialize()`, this source has no
+    content folders of its own - only per-stack layer folders (e.g.
+    ``backend/``, ``frontend/``), each containing the usual
+    ``instructions|prompts|agents|skills`` structure. Materialized files are
+    named ``<layer>_<filename>.<kind>.md`` instead of using a fixed prefix,
+    so files from different layers never collide.
+
+    Args:
+        source_root: Root of the layered source tree (e.g.
+            ``{instructions_path}/core/code_instructions``).
+        app_path: Root of the app code repo.
+        result: `MaterializeResult` to append written files to.
+    """
+    if not source_root.is_dir():
+        return
+
+    for layer_dir in sorted(p for p in source_root.iterdir() if p.is_dir()):
+        layer = layer_dir.name
+
+        for kind in _CONTENT_KINDS:
+            source_dir = layer_dir / kind
+            if not source_dir.is_dir():
+                continue
+
+            dest_dir = app_path / ".github" / kind
+            for source_file in sorted(source_dir.glob("*.md")):
+                dest_file = dest_dir / f"{layer}_{source_file.stem}.{kind}.md"
+                content = _ensure_frontmatter(source_file, kind)
+
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                dest_file.write_text(content, encoding="utf-8")
+                result.written.append(dest_file)
 
 
 def _ensure_frontmatter(source_file: Path, kind: str) -> str:
