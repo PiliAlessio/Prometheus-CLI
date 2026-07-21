@@ -43,7 +43,7 @@ class TestMaterialize:
 
         domain_file = app_path / ".github" / "instructions" / "domain.style.md"
         core_file = app_path / ".github" / "prompts" / "core.review.md"
-        code_file = app_path / ".github" / "skills" / "backend_helper.skills.md"
+        code_file = app_path / ".github" / "skills" / "backend.helper.skills.md"
 
         assert domain_file.exists()
         assert core_file.exists()
@@ -86,16 +86,50 @@ class TestMaterialize:
         assert result.written_count == 3
 
         backend_instructions = (
-            app_path / ".github" / "instructions" / "backend_style.instructions.md"
+            app_path / ".github" / "instructions" / "backend.style.instructions.md"
         )
         frontend_instructions = (
-            app_path / ".github" / "instructions" / "frontend_style.instructions.md"
+            app_path / ".github" / "instructions" / "frontend.style.instructions.md"
         )
-        backend_prompt = app_path / ".github" / "prompts" / "backend_review.prompts.md"
+        backend_prompt = app_path / ".github" / "prompts" / "backend.review.prompts.md"
 
         assert backend_instructions.exists()
         assert frontend_instructions.exists()
         assert backend_prompt.exists()
+
+    def test_materializes_helpers_verbatim_with_origin_prefix(self, tmp_path):
+        instructions_path = tmp_path / "app-instructions"
+        app_path = tmp_path / "app"
+
+        _write(
+            instructions_path / "domain" / "helpers" / "setup.sh",
+            "#!/bin/sh\necho domain helper\n",
+        )
+        _write(
+            instructions_path / "core" / "core" / "helpers" / "lint.py",
+            "print('core helper')\n",
+        )
+        _write(
+            instructions_path
+            / "core"
+            / "code_instructions"
+            / "backend"
+            / "helpers"
+            / "seed.py",
+            "print('backend helper')\n",
+        )
+
+        result = materialize(instructions_path, app_path)
+
+        assert result.written_count == 3
+
+        domain_helper = app_path / ".github" / "helpers" / "domain.setup.sh"
+        core_helper = app_path / ".github" / "helpers" / "core.lint.py"
+        backend_helper = app_path / ".github" / "helpers" / "backend.seed.py"
+
+        assert domain_helper.read_text(encoding="utf-8") == "#!/bin/sh\necho domain helper\n"
+        assert core_helper.read_text(encoding="utf-8") == "print('core helper')\n"
+        assert backend_helper.read_text(encoding="utf-8") == "print('backend helper')\n"
 
     def test_fills_in_missing_required_frontmatter(self, tmp_path):
         instructions_path = tmp_path / "app-instructions"
@@ -203,6 +237,7 @@ class TestEnsureGitignoreEntries:
         assert ".github/prompts/" in content
         assert ".github/agents/" in content
         assert ".github/skills/" in content
+        assert ".github/helpers/" in content
 
     def test_appends_missing_entries_to_existing_gitignore(self, tmp_path):
         app_path = tmp_path / "app"

@@ -20,8 +20,15 @@ folders of its own, only per-stack layer folders (e.g. ``backend/``,
 ``instructions|prompts|agents|skills`` structure. Files found there are
 materialized using the layer folder's name as the naming pattern instead of
 a fixed prefix - e.g. ``backend/instructions/foo.md`` becomes
-``.github/instructions/backend_foo.instructions.md`` - so files from
+``.github/instructions/backend.foo.instructions.md`` - so files from
 different stack layers never collide and their origin stays obvious.
+
+Each source tree can also contain a ``helpers/`` folder (scripts and other
+non-instructional utility files). Unlike the other kinds, helper files are
+copied verbatim into ``.github/helpers`` - no frontmatter handling, no
+forced ``.md`` extension - just renamed with the same origin prefix (e.g.
+``domain.``, ``core.``, ``backend.``) so files from different sources never
+collide.
 
 Each materialized destination folder is fully cleared and rebuilt on every
 run, so the app repo's ``.github/`` content always mirrors the current
@@ -55,13 +62,23 @@ _SOURCE_PREFIXES: dict[str, str] = {
 
 # core/code_instructions has no content folders of its own - it only has
 # per-stack layer folders (e.g. backend/, frontend/), each containing the
-# usual instructions|prompts|agents|skills structure. Materialized as
-# <layer>_<filename>.<kind>.md instead of a fixed prefix, so files from
+# usual instructions|prompts|agents|skills(|helpers) structure. Materialized
+# as <layer>.<filename>.<kind>.md instead of a fixed prefix, so files from
 # different layers never collide.
 _LAYERED_SOURCE = "core/code_instructions"
 
-# Content subfolders copied into the matching .github/<kind> destination.
-_CONTENT_KINDS = ("instructions", "prompts", "agents", "skills")
+# Markdown content subfolders, frontmatter-processed and copied into the
+# matching .github/<kind> destination.
+_MARKDOWN_KINDS = ("instructions", "prompts", "agents", "skills")
+
+# Non-markdown utility content (scripts, etc.) copied verbatim - no
+# frontmatter handling, original filename/extension preserved aside from the
+# origin prefix.
+_HELPERS_KIND = "helpers"
+
+# All content subfolders, including helpers, used for .github/ dest dirs and
+# .gitignore entries.
+_CONTENT_KINDS = _MARKDOWN_KINDS + (_HELPERS_KIND,)
 
 _FRONTMATTER_RE = re.compile(r"^---\r?\n(.*?)\r?\n---\r?\n?", re.DOTALL)
 
@@ -112,7 +129,7 @@ def materialize(instructions_path: Path, app_path: Path) -> MaterializeResult:
         if not source_root.is_dir():
             continue
 
-        for kind in _CONTENT_KINDS:
+        for kind in _MARKDOWN_KINDS:
             source_dir = source_root / kind
             if not source_dir.is_dir():
                 continue
@@ -125,6 +142,8 @@ def materialize(instructions_path: Path, app_path: Path) -> MaterializeResult:
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 dest_file.write_text(content, encoding="utf-8")
                 result.written.append(dest_file)
+
+        _materialize_helpers(source_root / _HELPERS_KIND, app_path, prefix, result)
 
     _materialize_layered_source(instructions_path / _LAYERED_SOURCE, app_path, result)
 
@@ -139,9 +158,9 @@ def _materialize_layered_source(
     Unlike the flat sources handled in `materialize()`, this source has no
     content folders of its own - only per-stack layer folders (e.g.
     ``backend/``, ``frontend/``), each containing the usual
-    ``instructions|prompts|agents|skills`` structure. Materialized files are
-    named ``<layer>_<filename>.<kind>.md`` instead of using a fixed prefix,
-    so files from different layers never collide.
+    ``instructions|prompts|agents|skills(|helpers)`` structure. Materialized
+    files are named ``<layer>.<filename>.<kind>.md`` instead of using a
+    fixed prefix, so files from different layers never collide.
 
     Args:
         source_root: Root of the layered source tree (e.g.
@@ -154,20 +173,52 @@ def _materialize_layered_source(
 
     for layer_dir in sorted(p for p in source_root.iterdir() if p.is_dir()):
         layer = layer_dir.name
+        prefix = f"{layer}."
 
-        for kind in _CONTENT_KINDS:
+        for kind in _MARKDOWN_KINDS:
             source_dir = layer_dir / kind
             if not source_dir.is_dir():
                 continue
 
             dest_dir = app_path / ".github" / kind
             for source_file in sorted(source_dir.glob("*.md")):
-                dest_file = dest_dir / f"{layer}_{source_file.stem}.{kind}.md"
+                dest_file = dest_dir / f"{prefix}{source_file.stem}.{kind}.md"
                 content = _ensure_frontmatter(source_file, kind)
 
                 dest_dir.mkdir(parents=True, exist_ok=True)
                 dest_file.write_text(content, encoding="utf-8")
                 result.written.append(dest_file)
+
+        _materialize_helpers(layer_dir / _HELPERS_KIND, app_path, prefix, result)
+
+
+def _materialize_helpers(
+    source_dir: Path, app_path: Path, prefix: str, result: MaterializeResult
+) -> None:
+    """Copy helper files (scripts, other utilities) verbatim into .github/helpers.
+
+    Unlike the markdown kinds, helper files are not required to be markdown
+    and receive no frontmatter processing - they are copied byte-for-byte,
+    only renamed with the given origin prefix so files from different
+    sources never collide.
+
+    Args:
+        source_dir: The source ``helpers`` folder (may not exist).
+        app_path: Root of the app code repo.
+        prefix: Origin prefix to apply to each filename (e.g. ``domain.``,
+            ``core.``, ``backend.``).
+        result: `MaterializeResult` to append written files to.
+    """
+    if not source_dir.is_dir():
+        return
+
+    dest_dir = app_path / ".github" / _HELPERS_KIND
+    for source_file in sorted(p for p in source_dir.iterdir() if p.is_file()):
+        dest_file = dest_dir / f"{prefix}{source_file.name}"
+
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_file, dest_file)
+        result.written.append(dest_file)
 
 
 def _ensure_frontmatter(source_file: Path, kind: str) -> str:
