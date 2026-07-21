@@ -309,7 +309,7 @@ class InitWorkflow:
         - If app_instructions_remote is provided and accessible: clones from that URL
         - If app_instructions_remote is not provided: creates a local git repo
           (user can push later)
-        - Either way: ensures app/ folder structure exists and adds core as submodule
+        - Either way: ensures domain/ folder structure exists and adds core as submodule
         - If remote exists, commits and pushes the submodule setup
 
         Raises:
@@ -325,7 +325,7 @@ class InitWorkflow:
             self._ensure_main_branch(self.instructions_path)
             # Ensure origin remote is configured (older/broken local repos may lack it)
             self._ensure_instructions_remote()
-            # Detect and optionally clean up an older (pre app/+core/) layout
+            # Detect and optionally clean up an older (pre domain/+core/) layout
             self._maybe_clean_legacy_structure()
             # Ensure standard folder structure exists
             self._create_folder_structure()
@@ -361,7 +361,7 @@ class InitWorkflow:
 
                 if result.returncode == 0:
                     print("[DEBUG] Clone successful, setting up submodule...")
-                    # Detect and optionally clean up an older (pre app/+core/) layout
+                    # Detect and optionally clean up an older (pre domain/+core/) layout
                     self._maybe_clean_legacy_structure()
                     # Create standard folder structure with .gitkeep files
                     self._create_folder_structure()
@@ -448,15 +448,17 @@ class InitWorkflow:
         """Detect an older instructions-repo layout and offer to clean it up.
 
         Older versions of this tool created content folders (instructions/,
-        prompts/, skills/, config/, docs/) and the core submodule directly at
-        the repo root instead of under app/ and core/. If leftover entries from
-        that layout are detected, ask the user whether to remove them so the
-        repo can be rebuilt cleanly with the current app/ + core/ structure.
+        prompts/, skills/, config/, docs/) directly at the repo root, or under
+        an `app/` folder, instead of under `domain/` alongside the `core/`
+        submodule. If leftover entries from an older layout are detected
+        (including a stale `app/` folder), ask the user whether to remove them
+        so the repo can be rebuilt cleanly with the current domain/ + core/
+        structure.
 
         If the user declines, the legacy entries are left in place and will
-        simply coexist alongside the new app/ and core/ folders.
+        simply coexist alongside the new domain/ and core/ folders.
         """
-        expected_entries = {".git", ".gitignore", ".gitmodules", "app", "core"}
+        expected_entries = {".git", ".gitignore", ".gitmodules", "domain", "core"}
         try:
             entries = [p.name for p in self.instructions_path.iterdir()]
         except OSError:
@@ -472,7 +474,7 @@ class InitWorkflow:
                 input(
                     "\nThe app-instructions repository contains files from an older "
                     f"layout ({', '.join(legacy_entries)}).\n"
-                    "Remove them and rebuild with the current app/ + core/ structure? "
+                    "Remove them and rebuild with the current domain/ + core/ structure? "
                     "[y/N]: "
                 )
                 .strip()
@@ -504,32 +506,35 @@ class InitWorkflow:
     def _create_folder_structure(self) -> None:
         """Create standard folder structure with .gitkeep files.
 
-        Creates content folders under app/ in the app-specific instructions repository:
-        - app/instructions/ - for app-specific instructions
-        - app/prompts/ - for AI prompts and instructions
-        - app/skills/ - for domain-specific skills
-        - app/config/ - for configuration files
-        - app/docs/ - for documentation
+        Creates content folders under domain/ in the app-specific instructions repository:
+        - domain/instructions/ - for app-specific instructions
+        - domain/prompts/ - for AI prompts and instructions
+        - domain/skills/ - for domain-specific skills
+        - domain/config/ - for configuration files
+        - domain/docs/ - for documentation
 
-        The core/ submodule lives as a sibling of app/ at the repo root, so the
+        The core/ submodule lives as a sibling of domain/ at the repo root, and
+        itself contains two folders (core/ and code_instructions/), so the
         final layout is:
             {app_name}-instructions/
-            ├── app/
+            ├── domain/
             │   ├── instructions/
             │   ├── prompts/
             │   ├── skills/
             │   ├── config/
             │   └── docs/
             └── core/ (git submodule)
+                ├── core/
+                └── code_instructions/
 
         Each folder gets a .gitkeep file to ensure Git tracks empty directories.
         """
         folders = [
-            "app/instructions",
-            "app/prompts",
-            "app/skills",
-            "app/config",
-            "app/docs",
+            "domain/instructions",
+            "domain/prompts",
+            "domain/skills",
+            "domain/config",
+            "domain/docs",
         ]
 
         print(f"[DEBUG] Creating folder structure in {self.instructions_path}")
@@ -711,16 +716,27 @@ class InitWorkflow:
     def _add_core_submodule_to_instructions(self) -> None:
         """Add core as a submodule in the app-specific instructions repository.
 
-        Removes CLI and docs folders to keep only essential core structure.
+        The core submodule keeps its own nested core/ and code_instructions/
+        folders as-is (no flattening) - only unnecessary folders (docs and
+        tools/cli) are removed to save space.
         """
         core_submodule_path = self.instructions_path / "core"
 
         # Check if already a submodule
         if (core_submodule_path / ".git").exists():
-            # Already added - but a previous run may have left core/core/ nested.
-            # Flatten it so existing repos get fixed up too.
-            self._flatten_core_submodule(core_submodule_path)
+            # Older CLI versions deleted tools/cli and docs directly (via
+            # shutil.rmtree) instead of using sparse-checkout, which left the
+            # submodule's working tree dirty with staged-looking deletions.
+            # Repair that before re-applying the sparse-checkout so those
+            # stale deletions never get committed/pushed to the shared remote.
+            self._repair_legacy_submodule_deletions(core_submodule_path)
             self._cleanup_submodule_folders(core_submodule_path)
+            # Bring the submodule up to date with the latest core commit.
+            self._run_git(
+                ["submodule", "update", "--remote", "--", "core"],
+                cwd=self.instructions_path,
+                check=False,
+            )
             return
 
         try:
@@ -738,15 +754,12 @@ class InitWorkflow:
                 check=False,
             )
 
-            # The Prometheus core repo has its own nested core/ folder; flatten
-            # it so we don't end up with core/core/ inside the submodule.
-            self._flatten_core_submodule(core_submodule_path)
-
-            # Remove unnecessary folders to save space (docs and tools/cli)
+            # Remove unnecessary folders to save space (docs and tools/cli),
+            # keeping the submodule's core/ and code_instructions/ folders intact.
             self._cleanup_submodule_folders(core_submodule_path)
 
         except Exception:
-            # If submodule add fails, that's ok - the app/ folder structure was created
+            # If submodule add fails, that's ok - the domain/ folder structure was created
             pass
 
     def _create_gitignore(self) -> None:
@@ -768,62 +781,54 @@ class InitWorkflow:
             # Create new .gitignore with .prometheus.yml
             gitignore_path.write_text(".prometheus.yml\n")
 
-    def _flatten_core_submodule(self, submodule_path: Path) -> None:
-        """Flatten a nested core/ folder from within the core submodule.
+    def _repair_legacy_submodule_deletions(self, submodule_path: Path) -> None:
+        """Restore tools/cli/ and docs/ if a previous CLI version deleted them.
 
-        The Prometheus core remote repository has its own top-level core/
-        folder (used by detect_context to identify the main Prometheus repo).
-        Adding that whole repo as a submodule named "core" would otherwise
-        result in core/core/ nesting. This moves the nested core/ content up
-        to the submodule root and removes the now-empty nested folder.
+        Older versions of `_cleanup_submodule_folders` removed these paths
+        with shutil.rmtree instead of sparse-checkout, leaving them as
+        uncommitted deletions in the submodule's working tree. If left as-is,
+        `prometheus push` would commit and push those deletions to the shared
+        core remote, which can also cause "fetch first" push rejections once
+        the remote has advanced. Restore any such stray deletions so the
+        submodule's working tree is clean before applying sparse-checkout.
 
         Args:
             submodule_path: Path to the core submodule.
         """
-        nested_core = submodule_path / "core"
-        if not nested_core.is_dir():
-            return
-
         try:
-            import shutil
-
-            for item in list(nested_core.iterdir()):
-                target = submodule_path / item.name
-                if target.exists():
-                    if target.is_dir() and not target.is_symlink():
-                        shutil.rmtree(target)
-                    else:
-                        target.unlink()
-                shutil.move(str(item), str(target))
-
-            shutil.rmtree(nested_core)
+            self._run_git(
+                ["checkout", "--", "tools/cli", "docs"],
+                cwd=submodule_path,
+                check=False,
+            )
         except Exception:
-            # Flattening is best-effort - if it fails, the submodule still works
+            # Best-effort repair - if it fails, sparse-checkout still hides
+            # the paths going forward.
             pass
 
     def _cleanup_submodule_folders(self, submodule_path: Path) -> None:
-        """Remove unnecessary folders from the core submodule to save space.
+        """Exclude unnecessary folders from the core submodule's checkout.
 
-        Removes:
+        Excludes:
         - tools/cli/ - CLI implementation (not needed in app repo)
         - docs/ - Documentation (can be accessed from main Prometheus repo)
+
+        Uses `git sparse-checkout` so these paths are hidden from the working
+        tree without ever touching Git's tracked state. Deleting tracked files
+        directly (e.g. via shutil.rmtree) leaves the submodule's working tree
+        "dirty" with staged-looking deletions, which later get committed and
+        mistakenly pushed to the shared core remote by `prometheus push`.
 
         Args:
             submodule_path: Path to the core submodule.
         """
         try:
-            import shutil
-
-            # Folders to remove
-            cleanup_paths = [submodule_path / "tools" / "cli", submodule_path / "docs"]
-
-            for path in cleanup_paths:
-                if path.exists():
-                    if path.is_dir():
-                        shutil.rmtree(path)
-                    else:
-                        path.unlink()
-
+            self._run_git(["sparse-checkout", "init"], cwd=submodule_path, check=False)
+            self._run_git(
+                ["sparse-checkout", "set", "/*", "!/tools/cli", "!/docs"],
+                cwd=submodule_path,
+                check=False,
+            )
         except Exception:
             # Cleanup is optional - if it fails, the submodule still works
             pass
@@ -887,10 +892,10 @@ class InitWorkflow:
         ./.github/prometheus -> ~/.prometheus/{app_name}-instructions/
 
         The "prometheus" layer only exists in the app code repo - the
-        instructions repo itself stays flat (app/ and core/ at its root).
+        instructions repo itself stays flat (domain/ and core/ at its root).
         This allows the app code repo to reference the full instructions repo
-        (app/ content folders and the core/ submodule) through
-        .github/prometheus/app and .github/prometheus/core.
+        (domain/ content folders and the core/ submodule) through
+        .github/prometheus/domain and .github/prometheus/core.
 
         Returns:
             True if symlink was created, False if creation failed.

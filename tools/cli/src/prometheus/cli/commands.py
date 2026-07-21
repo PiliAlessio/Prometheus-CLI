@@ -33,10 +33,12 @@ def cli():
 
 @cli.command()
 def push():
-    """Push committed changes for the app repo and prometheus-core submodule.
+    """Push committed changes for the app-specific instructions repository.
 
-    This command pushes changes from both the app repository and the
-    prometheus-core git submodule to their respective remotes.
+    This command pushes changes from the app-instructions repository
+    (domain/ content and the core submodule pointer). The core submodule
+    itself is shared, read-only content: its local state is reported but
+    never committed or pushed - use 'prometheus pull' to sync it instead.
 
     Examples:
         prometheus push
@@ -153,7 +155,7 @@ def init(app_name, app_remote, app_instructions_remote, core_remote, create_app_
     - Validates all three remotes are accessible
     - Stores remote URLs in .prometheus.yml (local only, not pushed)
     - Creates .github/prometheus symlink in app code pointing to the
-      app-instructions repo (app/ and core/)
+      app-instructions repo (domain/ and core/)
     - Sets up core as submodule in app-specific instructions repo
 
     Examples:
@@ -261,8 +263,8 @@ def sync():
     """Pull the latest changes and push all local commits.
 
     This command performs a two-step workflow:
-    1. Pulls the latest changes from both app and core repositories
-    2. Pushes all local commits to their respective remotes
+    1. Pulls the latest app and core changes (core is shared/read-only)
+    2. Pushes local app-instructions commits to their remote
 
     This ensures your local changes are pushed after pulling any remote updates.
 

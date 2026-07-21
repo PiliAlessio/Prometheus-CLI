@@ -88,11 +88,17 @@ def detect_push_state(start_path: str | Path | None = None) -> PushSummary:
 
 
 def push_changes(start_path: str | Path | None = None) -> PushSummary:
-    """Push changes to app-instructions repository and its core submodule."""
+    """Push changes to the app-instructions repository.
+
+    The core submodule is shared, read-only content: it is never committed
+    to or pushed from here. Use 'prometheus pull' to sync it from upstream
+    instead. Any local modifications detected inside core/ are reported but
+    left untouched.
+    """
     summary = detect_push_state(start_path)
     _push_repo(summary.app)
     if summary.core:
-        _push_repo(summary.core)
+        _report_readonly_core(summary.core)
     return summary
 
 
@@ -105,6 +111,23 @@ def _inspect_repo(path: Path, name: str) -> RepoPushState:
     state = RepoPushState(name=name, path=path, branch=branch, ahead_count=ahead_count)
     state.modified_details = modified_details
     state.modified_files = [item.path for item in modified_details]
+    return state
+
+
+def _report_readonly_core(state: RepoPushState) -> RepoPushState:
+    """Report the core submodule's state without committing or pushing.
+
+    The core submodule is shared across all apps and is treated as
+    read-only: local modifications are never committed or pushed to its
+    remote. Run 'prometheus pull' to sync it with upstream instead.
+    """
+    if state.modified_files:
+        state.skipped_reason = (
+            "core is read-only (shared submodule) - local changes are not pushed; "
+            "run 'prometheus pull' to sync from upstream instead"
+        )
+    else:
+        state.skipped_reason = "core is read-only (shared submodule) - not pushed"
     return state
 
 
@@ -134,7 +157,17 @@ def _push_repo(state: RepoPushState) -> RepoPushState:
         return state
 
     # Use -u flag to set up upstream tracking for new branches
-    _run_git(["push", "-u", "origin", state.branch], cwd=state.path)
+    try:
+        _run_git(["push", "-u", "origin", state.branch], cwd=state.path)
+    except RuntimeError as e:
+        message = str(e)
+        if "rejected" in message.lower() or "fetch first" in message.lower():
+            raise RuntimeError(
+                f"Push rejected for {state.name}: the remote has commits that are not "
+                f"present locally.\nRun 'prometheus pull' first to sync {state.name}, "
+                f"then try 'prometheus push' again.\n\nGit error:\n{message}"
+            ) from e
+        raise
     state.pushed = True
     return state
 

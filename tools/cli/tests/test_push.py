@@ -92,7 +92,9 @@ class TestPushChanges:
         assert summary.app.pushed is True
         assert summary.app.name == "app-instructions"
         assert summary.core is not None
-        assert summary.core.pushed is True
+        assert summary.core.pushed is False
+        assert summary.core.skipped_reason is not None
+        assert "read-only" in summary.core.skipped_reason
 
     def test_skips_dirty_repo(self, setup_push_mocks, monkeypatch):
         tmp_path, setup_context_mock = setup_push_mocks
@@ -221,7 +223,7 @@ class TestPushChanges:
         assert summary.app.skipped_reason is None
 
     def test_push_with_modified_core_submodule(self, setup_push_mocks, monkeypatch):
-        """Test push with only modified core submodule - should commit and push."""
+        """Test push with modified core submodule - core is read-only, must not be pushed."""
         tmp_path, setup_context_mock = setup_push_mocks
         app_root, instructions_root, core_root = _setup_test_repos(tmp_path)
         setup_context_mock(app_root)
@@ -237,12 +239,7 @@ class TestPushChanges:
                 ("rev-parse", "--abbrev-ref", "HEAD"): "main",
                 ("status", "--porcelain=v1", "-z"): " M documentation/guide.md\0",
                 ("status", "--branch", "--porcelain"): "## main...origin/main [ahead 1]",
-                ("add", "-A"): "",
                 ("rev-list", "HEAD", "--count"): "2",
-                ("config", "--get", "user.name"): "",
-                ("config", "user.name", "Prometheus"): "",
-                ("config", "--get", "user.email"): "",
-                ("config", "user.email", "prometheus@localhost"): "",
             },
         }
 
@@ -260,10 +257,13 @@ class TestPushChanges:
 
         summary = push_changes(app_root)
 
-        # Core has uncommitted changes, should commit and push
+        # Core is shared/read-only: modifications are reported but never
+        # committed or pushed.
         assert summary.core is not None
-        assert summary.core.pushed is True
-        assert summary.core.skipped_reason is None
+        assert summary.core.pushed is False
+        assert summary.core.modified_files == ["documentation/guide.md"]
+        assert summary.core.skipped_reason is not None
+        assert "read-only" in summary.core.skipped_reason
 
     def test_push_with_no_changes(self, setup_push_mocks, monkeypatch):
         """Test push with no changes in app-instructions or core."""
@@ -297,7 +297,8 @@ class TestPushChanges:
         assert summary.app.skipped_reason == "no commits to push"
         assert summary.core is not None
         assert summary.core.pushed is False
-        assert summary.core.skipped_reason == "no commits to push"
+        assert summary.core.skipped_reason is not None
+        assert "read-only" in summary.core.skipped_reason
 
     def test_push_handles_git_error(self, setup_push_mocks, monkeypatch):
         """Test push error handling for git operations."""

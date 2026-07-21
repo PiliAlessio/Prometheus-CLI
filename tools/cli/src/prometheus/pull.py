@@ -34,7 +34,14 @@ def pull_app(start_path: str | Path | None = None) -> PullSummary:
         )
 
     _run_git(["pull", "--ff-only"], cwd=context.root_path)
-    _run_git(["submodule", "update", "--remote"], cwd=context.root_path)
+
+    # The core submodule is registered in .gitmodules of the repository that
+    # added it (the app-instructions repo, reached here via the
+    # .github/prometheus symlink) - NOT the app code repo itself. Running
+    # `submodule update` with cwd=root_path silently no-ops because root_path
+    # has no .gitmodules of its own.
+    if context.core_path:
+        _run_git(["submodule", "update", "--remote"], cwd=context.core_path.parent)
 
     app_after = _run_git(["rev-parse", "HEAD"], cwd=context.root_path, check=False) or "unknown"
     core_after = None
