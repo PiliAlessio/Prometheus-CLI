@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from prometheus.context import detect_context
-from prometheus.materialize.materialize import materialize
+from prometheus.materialize.materialize import (
+    commit_gitignore_if_pending,
+    ensure_gitignore_entries,
+    materialize,
+)
 
 
 @dataclass
@@ -66,6 +70,12 @@ def update_app(start_path: str | Path | None = None) -> UpdateSummary:
 
     materialized_files = 0
     if context.core_path:
+        # Ensure the app repo's .gitignore excludes the materialized
+        # folders and commit (best-effort push) that change now - strictly
+        # before materialize() ever writes a file - so no commit can ever
+        # bundle the .gitignore change together with materialized content.
+        ensure_gitignore_entries(context.root_path)
+        commit_gitignore_if_pending(context.root_path)
         materialize_result = materialize(context.core_path.parent, context.root_path)
         materialized_files = materialize_result.written_count
 

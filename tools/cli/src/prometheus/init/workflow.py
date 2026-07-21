@@ -7,7 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from prometheus.config import Config
-from prometheus.materialize.materialize import materialize
+from prometheus.materialize.materialize import (
+    commit_gitignore_if_pending,
+    ensure_gitignore_entries,
+    materialize,
+)
 
 DEFAULT_CORE_REPO_URL = "https://github.com/AlessioPili-KT/Prometheus.git"
 
@@ -111,7 +115,17 @@ class InitWorkflow:
         # Phase 5: Create configuration file
         config_path = self._create_config_file(core_version)
 
-        # Phase 6: Materialize domain/core/code content directly into native
+        # Phase 6: Commit (and best-effort push) any pending .gitignore
+        # change in the app repo now - strictly before Phase 7 ever writes a
+        # materialized file - so the ignore rules for
+        # .github/instructions|prompts|agents|skills are guaranteed to
+        # already be recorded in the app repo's git history before those
+        # folders can ever contain content. This way no commit (manual or
+        # automated) can ever bundle the .gitignore change together with
+        # actual materialized instructions in the same commit.
+        commit_gitignore_if_pending(self.app_path)
+
+        # Phase 7: Materialize domain/core/code content directly into native
         # .github/instructions|prompts|agents|skills locations in the app
         # code repo. There is no longer a .github/prometheus symlink into the
         # cached app-instructions repo - the materialized copies are the only
@@ -779,17 +793,6 @@ class InitWorkflow:
             # If submodule add fails, that's ok - the domain/ folder structure was created
             pass
 
-    # Materialized content folders in the app code repo's .github/ that are
-    # local copies rebuilt from the app-instructions repo on every
-    # init/pull/update - never the app repo's own content, so they must
-    # never be committed/pushed from the app code repo.
-    _MATERIALIZED_GITIGNORE_ENTRIES = (
-        ".github/instructions/",
-        ".github/prompts/",
-        ".github/agents/",
-        ".github/skills/",
-    )
-
     def _create_gitignore(self) -> None:
         """Create .gitignore files in app repo.
 
@@ -802,18 +805,19 @@ class InitWorkflow:
         # App code repo .gitignore
         gitignore_path = self.app_path / ".gitignore"
 
-        entries = [".prometheus.yml", *self._MATERIALIZED_GITIGNORE_ENTRIES]
-
         if gitignore_path.exists():
             content = gitignore_path.read_text()
-            missing = [entry for entry in entries if entry not in content]
-            if missing:
+            if ".prometheus.yml" not in content:
                 with open(gitignore_path, "a") as f:
                     if not content.endswith("\n"):
                         f.write("\n")
-                    f.write("\n".join(missing) + "\n")
+                    f.write(".prometheus.yml\n")
         else:
-            gitignore_path.write_text("\n".join(entries) + "\n")
+            gitignore_path.write_text(".prometheus.yml\n")
+
+        # Materialized content folders are excluded via a shared helper (also
+        # used by pull/update) so the same entries stay in sync everywhere.
+        ensure_gitignore_entries(self.app_path)
 
     def _repair_legacy_submodule_deletions(self, submodule_path: Path) -> None:
         """Restore tools/cli/ and docs/ if a previous CLI version deleted them.
