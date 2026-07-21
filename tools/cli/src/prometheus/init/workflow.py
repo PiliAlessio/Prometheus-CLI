@@ -9,7 +9,7 @@ from pathlib import Path
 from prometheus.config import Config
 from prometheus.symlink.symlink import SymlinkManager
 
-DEFAULT_CORE_REPO_URL = "https://github.com/PiliAlessio/Prometheus.git"
+DEFAULT_CORE_REPO_URL = "https://github.com/AlessioPili-KT/Prometheus.git"
 
 
 @dataclass

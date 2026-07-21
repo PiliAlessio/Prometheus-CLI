@@ -13,7 +13,7 @@ This repository contains:
 ### Windows (PowerShell)
 
 ```powershell
-git clone https://github.com/PiliAlessio/Prometheus-CLI.git
+git clone https://github.com/AlessioPili-KT/Prometheus-CLI.git
 cd Prometheus-CLI
 .\install.ps1
 ```
@@ -21,7 +21,7 @@ cd Prometheus-CLI
 ### Linux / macOS
 
 ```bash
-git clone https://github.com/PiliAlessio/Prometheus-CLI.git
+git clone https://github.com/AlessioPili-KT/Prometheus-CLI.git
 cd Prometheus-CLI
 chmod +x install.sh
 ./install.sh
@@ -31,7 +31,7 @@ chmod +x install.sh
 
 - [Installation Guide](./INSTALL.md) - Detailed installation instructions and troubleshooting
 - [CLI Tool Documentation](./tools/cli/README.md) - Usage and commands
-- [Prometheus Core](https://github.com/PiliAlessio/Prometheus) - Core instructions and workflows
+- [Prometheus Core](https://github.com/AlessioPili-KT/Prometheus) - Core instructions and workflows
 
 ## Structure
 
@@ -60,4 +60,4 @@ Same as Prometheus Core
 
 ---
 
-For more information, see [Prometheus Core](https://github.com/PiliAlessio/Prometheus).
+For more information, see [Prometheus Core](https://github.com/AlessioPili-KT/Prometheus).

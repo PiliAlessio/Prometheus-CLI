@@ -65,7 +65,7 @@ For developers or those who prefer building locally.
 **Clone and install:**
 ```bash
 # Clone the repository
-git clone https://github.com/PiliAlessio/Prometheus.git
+git clone https://github.com/AlessioPili-KT/Prometheus.git
 cd Prometheus/tools/cli
 
 # Create virtual environment (recommended)
@@ -81,12 +81,12 @@ prometheus version
 
 **Or install directly from git:**
 ```bash
-pip install git+https://github.com/PiliAlessio/Prometheus.git@main#egg=prometheus-cli&subdirectory=tools/cli
+pip install git+https://github.com/AlessioPili-KT/Prometheus.git@main#egg=prometheus-cli&subdirectory=tools/cli
 ```
 
 **For development (with test dependencies):**
 ```bash
-git clone https://github.com/PiliAlessio/Prometheus.git
+git clone https://github.com/AlessioPili-KT/Prometheus.git
 cd Prometheus/tools/cli
 
 python -m venv venv
@@ -104,7 +104,7 @@ If you prefer containerized tools:
 
 **Using Docker image:**
 ```bash
-docker run --rm ghcr.io/piliAlessio/prometheus:latest version
+docker run --rm ghcr.io/AlessioPili-KT/prometheus:latest version
 ```
 
 **Or build from Dockerfile:**
@@ -323,7 +323,7 @@ Unbuilt versions will show `dev` or `unknown`. This doesn't affect functionality
 
 ### Still having issues?
 
-Open an issue on [GitHub](https://github.com/PiliAlessio/Prometheus/issues) with:
+Open an issue on [GitHub](https://github.com/AlessioPili-KT/Prometheus/issues) with:
 1. Output of `prometheus version`
 2. Output of `python --version`
 3. Output of `pip --version`
@@ -354,7 +354,7 @@ pip install --upgrade prometheus-cli
 prometheus version
 ```
 
-Check for updates at: https://github.com/PiliAlessio/Prometheus/releases
+Check for updates at: https://github.com/AlessioPili-KT/Prometheus/releases
 
 ## Uninstalling
 
@@ -369,13 +369,13 @@ prometheus version
 
 ## Getting Help
 
-- **Documentation**: https://github.com/PiliAlessio/Prometheus/blob/main/docs/
-- **Issues**: https://github.com/PiliAlessio/Prometheus/issues
-- **Releases**: https://github.com/PiliAlessio/Prometheus/releases
+- **Documentation**: https://github.com/AlessioPili-KT/Prometheus/blob/main/docs/
+- **Issues**: https://github.com/AlessioPili-KT/Prometheus/issues
+- **Releases**: https://github.com/AlessioPili-KT/Prometheus/releases
 - **CLI Help**: `prometheus help`
 - **PyPI Package**: https://pypi.org/project/prometheus-cli/
 
 ## License
 
-Prometheus CLI is licensed under the MIT License. See [LICENSE](https://github.com/PiliAlessio/Prometheus/blob/main/LICENSE) for details.
+Prometheus CLI is licensed under the MIT License. See [LICENSE](https://github.com/AlessioPili-KT/Prometheus/blob/main/LICENSE) for details.
 

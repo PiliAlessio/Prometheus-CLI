@@ -52,7 +52,7 @@ Example output:
 ```text
 Initializing Prometheus app repo: billing-api
   App path: C:\Users\you\.prometheus\billing-api
-  Core source: https://github.com/PiliAlessio/Prometheus.git
+  Core source: https://github.com/AlessioPili-KT/Prometheus.git
   Core version: 6c7d8e9
   Config: C:\Users\you\.prometheus\billing-api\.prometheus.yml
 [OK] App repository initialized successfully!
@@ -212,7 +212,7 @@ The init workflow refuses to write into a non-empty target folder. Choose a new 
 Check that Git can access the Prometheus repository URL:
 
 ```bash
-git ls-remote https://github.com/PiliAlessio/Prometheus.git
+git ls-remote https://github.com/AlessioPili-KT/Prometheus.git
 ```
 
 Then rerun init in a fresh target folder.

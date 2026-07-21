@@ -3,7 +3,7 @@
 A powerful command-line interface for repository initialization, management, and configuration discovery.
 
 **Version**: 0.1.0  
-**Repository**: [PiliAlessio/Prometheus](https://github.com/PiliAlessio/Prometheus)  
+**Repository**: [AlessioPili-KT/Prometheus](https://github.com/AlessioPili-KT/Prometheus)  
 **License**: MIT  
 **Language**: Python 3.9+
 
@@ -17,14 +17,14 @@ pip install prometheus-cli
 
 **Or build from source:**
 ```bash
-git clone https://github.com/PiliAlessio/Prometheus.git
+git clone https://github.com/AlessioPili-KT/Prometheus.git
 cd Prometheus/tools/cli
 pip install -e .
 ```
 
 **Using Docker:**
 ```bash
-docker run --rm ghcr.io/piliAlessio/prometheus:latest version
+docker run --rm ghcr.io/AlessioPili-KT/prometheus:latest version
 ```
 
 See [Installation Guide](../../docs/INSTALLATION.md) for detailed instructions.
@@ -566,7 +566,7 @@ For developers contributing to Prometheus CLI:
 
 ```bash
 # Clone the repository
-git clone https://github.com/PiliAlessio/Prometheus.git
+git clone https://github.com/AlessioPili-KT/Prometheus.git
 cd Prometheus/tools/cli
 
 # Create virtual environment
@@ -614,7 +614,7 @@ Check for updates:
 pip index versions prometheus-cli
 
 # Or visit
-https://github.com/PiliAlessio/Prometheus/releases
+https://github.com/AlessioPili-KT/Prometheus/releases
 ```
 
 To update:
@@ -628,7 +628,7 @@ prometheus version
 We welcome contributions! 
 
 ### Reporting Issues
-- Check existing [issues](https://github.com/PiliAlessio/Prometheus/issues)
+- Check existing [issues](https://github.com/AlessioPili-KT/Prometheus/issues)
 - Provide version info: `prometheus version`
 - Include reproduction steps
 
@@ -652,12 +652,12 @@ Prometheus CLI is licensed under the MIT License. See [LICENSE](../../LICENSE) f
 - **[CLI Guide](../../docs/CLI_GUIDE.md)** - Comprehensive usage guide
 - **[Build Guide](BUILD.md)** - Building and developing from source
 - **[Migration Guide](PYTHON_MIGRATION.md)** - Python migration from Go
-- **[Main Repository](https://github.com/PiliAlessio/Prometheus)** - Project documentation
+- **[Main Repository](https://github.com/AlessioPili-KT/Prometheus)** - Project documentation
 
 ## Support
 
-- **GitHub Issues**: [PiliAlessio/Prometheus/issues](https://github.com/PiliAlessio/Prometheus/issues)
-- **Releases**: [PiliAlessio/Prometheus/releases](https://github.com/PiliAlessio/Prometheus/releases)
+- **GitHub Issues**: [AlessioPili-KT/Prometheus/issues](https://github.com/AlessioPili-KT/Prometheus/issues)
+- **Releases**: [AlessioPili-KT/Prometheus/releases](https://github.com/AlessioPili-KT/Prometheus/releases)
 - **Documentation**: [docs/INSTALLATION.md](../../docs/INSTALLATION.md)
 - **PyPI Package**: [prometheus-cli](https://pypi.org/project/prometheus-cli/)
 

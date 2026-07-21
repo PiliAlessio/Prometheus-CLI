@@ -17,7 +17,7 @@ class TestInitCommand:
             config_path=tmp_path / "my-app" / ".prometheus.yml",
             app_remote="https://github.com/user/my-app.git",
             app_instructions_remote=None,
-            core_remote="https://github.com/PiliAlessio/Prometheus.git",
+            core_remote="https://github.com/AlessioPili-KT/Prometheus.git",
             core_version="abc123",
             symlink_created=True,
         )

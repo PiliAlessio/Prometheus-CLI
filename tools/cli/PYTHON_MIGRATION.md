@@ -61,7 +61,7 @@ tools/cli/
 **Go Version:**
 ```bash
 # Method 1: go install
-go install github.com/PiliAlessio/Prometheus/tools/cli/cmd/prometheus@latest
+go install github.com/AlessioPili-KT/Prometheus/tools/cli/cmd/prometheus@latest
 
 # Method 2: Binary download
 curl -O https://github.com/.../prometheus-linux-amd64.tar.gz
@@ -79,12 +79,12 @@ cp build/prometheus-linux-amd64 /usr/local/bin/
 pip install prometheus-cli
 
 # Method 2: From source
-git clone https://github.com/PiliAlessio/Prometheus.git
+git clone https://github.com/AlessioPili-KT/Prometheus.git
 cd Prometheus/tools/cli
 pip install -e .
 
 # Method 3: Docker
-docker run ghcr.io/piliAlessio/prometheus:latest version
+docker run ghcr.io/AlessioPili-KT/prometheus:latest version
 ```
 
 ## Why Python?
@@ -116,7 +116,7 @@ docker run ghcr.io/piliAlessio/prometheus:latest version
 #### Before (Go)
 ```bash
 # Installation
-go install github.com/PiliAlessio/Prometheus/tools/cli/cmd/prometheus@latest
+go install github.com/AlessioPili-KT/Prometheus/tools/cli/cmd/prometheus@latest
 # or
 curl -O https://github.com/.../prometheus-linux-amd64.tar.gz
 tar xzf prometheus-linux-amd64.tar.gz
@@ -143,7 +143,7 @@ prometheus version
 
 #### Before (Go)
 ```bash
-git clone https://github.com/PiliAlessio/Prometheus.git
+git clone https://github.com/AlessioPili-KT/Prometheus.git
 cd Prometheus/tools/cli
 
 go mod download
@@ -153,7 +153,7 @@ make test
 
 #### After (Python)
 ```bash
-git clone https://github.com/PiliAlessio/Prometheus.git
+git clone https://github.com/AlessioPili-KT/Prometheus.git
 cd Prometheus/tools/cli
 
 python -m venv venv
@@ -305,7 +305,7 @@ That's it! No configuration changes needed.
 
 ### Q: How do I report issues with the Python version?
 
-**A:** Same as before - open an issue on [GitHub](https://github.com/PiliAlessio/Prometheus/issues) with:
+**A:** Same as before - open an issue on [GitHub](https://github.com/AlessioPili-KT/Prometheus/issues) with:
 1. Output of `prometheus version`
 2. Output of `python --version`
 3. Steps to reproduce
@@ -330,7 +330,7 @@ That's it! No configuration changes needed.
 - **Installation Issues**: See [INSTALLATION.md](../../docs/INSTALLATION.md)
 - **Usage Questions**: See [CLI Guide](../../docs/CLI_GUIDE.md)
 - **Development Setup**: See [BUILD_PYTHON.md](BUILD_PYTHON.md)
-- **Report Bugs**: [GitHub Issues](https://github.com/PiliAlessio/Prometheus/issues)
+- **Report Bugs**: [GitHub Issues](https://github.com/AlessioPili-KT/Prometheus/issues)
 
 ### Roadmap
 
@@ -355,4 +355,4 @@ Future Python version features:
 **Python CLI Version**: 0.1.0  
 **Status**: Active Development
 
-For questions or feedback, please open an issue on [GitHub](https://github.com/PiliAlessio/Prometheus/issues).
+For questions or feedback, please open an issue on [GitHub](https://github.com/AlessioPili-KT/Prometheus/issues).

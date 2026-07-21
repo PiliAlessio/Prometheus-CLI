@@ -6,7 +6,7 @@
 
 ```powershell
 # Clone or pull the latest code
-git clone https://github.com/PiliAlessio/Prometheus-CLI.git
+git clone https://github.com/AlessioPili-KT/Prometheus-CLI.git
 cd Prometheus-CLI
 
 # Run the installation script
@@ -38,7 +38,7 @@ cd Prometheus-CLI
 
 ```bash
 # Clone or pull the latest code
-git clone https://github.com/PiliAlessio/Prometheus-CLI.git
+git clone https://github.com/AlessioPili-KT/Prometheus-CLI.git
 cd Prometheus-CLI
 
 # Run the installation script

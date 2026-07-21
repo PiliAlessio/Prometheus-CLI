@@ -24,7 +24,7 @@ This document describes how to build, test, and release the Prometheus Python CL
 
 #### 1. Clone the repository
 ```bash
-git clone https://github.com/PiliAlessio/Prometheus.git
+git clone https://github.com/AlessioPili-KT/Prometheus.git
 cd Prometheus/tools/cli
 ```
 
@@ -405,10 +405,10 @@ ENTRYPOINT ["prometheus"]
 docker build -t prometheus-cli:0.1.0 .
 
 # Tag for registry
-docker tag prometheus-cli:0.1.0 ghcr.io/piliAlessio/prometheus:0.1.0
+docker tag prometheus-cli:0.1.0 ghcr.io/AlessioPili-KT/prometheus:0.1.0
 
 # Push to registry (requires authentication)
-docker push ghcr.io/piliAlessio/prometheus:0.1.0
+docker push ghcr.io/AlessioPili-KT/prometheus:0.1.0
 ```
 
 #### Test image

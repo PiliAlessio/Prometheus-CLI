@@ -15,10 +15,10 @@ setup(
     description="A command-line tool for Prometheus project initialization and management",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/PiliAlessio/Prometheus",
+    url="https://github.com/AlessioPili-KT/Prometheus",
     project_urls={
-        "Bug Tracker": "https://github.com/PiliAlessio/Prometheus/issues",
-        "Source Code": "https://github.com/PiliAlessio/Prometheus/tree/main/tools/cli",
+        "Bug Tracker": "https://github.com/AlessioPili-KT/Prometheus/issues",
+        "Source Code": "https://github.com/AlessioPili-KT/Prometheus/tree/main/tools/cli",
     },
     packages=find_packages(where="src"),
     package_dir={"": "src"},

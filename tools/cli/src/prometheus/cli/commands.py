@@ -132,7 +132,7 @@ def _create_repo_with_gh(repo_name: str) -> str | None:
     "--core-remote",
     default=None,
     help="Core instructions repository URL. "
-    "Defaults to https://github.com/PiliAlessio/Prometheus.git",
+    "Defaults to https://github.com/AlessioPili-KT/Prometheus.git",
 )
 @click.option(
     "--create-app-repo",

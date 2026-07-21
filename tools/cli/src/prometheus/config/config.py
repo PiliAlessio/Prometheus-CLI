@@ -43,11 +43,11 @@ class Config:
         self.app_instructions_remote = app_instructions_remote
         self.core_remote = core_remote
         self.core_version = core_version
-        # Default GitHub base URL from env or use PiliAlessio as default
+        # Default GitHub base URL from env or use AlessioPili-KT as default
         self.github_base_url = (
             github_base_url
             or os.environ.get("PROMETHEUS_GITHUB_BASE_URL")
-            or "https://github.com/PiliAlessio"
+            or "https://github.com/AlessioPili-KT"
         )
 
     @property
