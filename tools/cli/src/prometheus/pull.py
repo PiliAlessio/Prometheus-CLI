@@ -6,6 +6,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from prometheus.config import Config
 from prometheus.context import detect_context
 from prometheus.materialize.materialize import (
     commit_gitignore_if_pending,
@@ -69,14 +70,30 @@ def pull_app(start_path: str | Path | None = None) -> PullSummary:
         )
 
     materialized_files = 0
+    # Materialize if we can determine the instructions repo path
+    instructions_path = None
     if context.core_path:
+        instructions_path = context.core_path.parent
+    elif context.config_path:
+        # Try to recover the instructions path even if core_path detection failed
+        try:
+            config = Config.from_file(context.config_path)
+            if config.app_name:
+                import os
+                base_path = os.environ.get("PROMETHEUS_INSTRUCTIONS_BASE")
+                base = Path(base_path) if base_path else Path.home() / ".prometheus"
+                instructions_path = base / f"{config.app_name}-instructions"
+        except (FileNotFoundError, Exception):
+            pass  # Config load failed, skip materialization
+
+    if instructions_path and instructions_path.exists():
         # Ensure the app repo's .gitignore excludes the materialized
         # folders and commit (best-effort push) that change now - strictly
         # before materialize() ever writes a file - so no commit can ever
         # bundle the .gitignore change together with materialized content.
         ensure_gitignore_entries(context.root_path)
         commit_gitignore_if_pending(context.root_path)
-        materialize_result = materialize(context.core_path.parent, context.root_path)
+        materialize_result = materialize(instructions_path, context.root_path)
         materialized_files = materialize_result.written_count
 
     return PullSummary(
