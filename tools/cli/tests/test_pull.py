@@ -22,10 +22,14 @@ class TestPullApp:
         responses = {
             (app_root, ("rev-parse", "HEAD")): ["app-before", "app-after"],
             (app_root, ("pull", "--ff-only")): ["Already up to date."],
-            (app_root, ("submodule", "update", "--remote")): [
+            (app_root, ("submodule", "sync", "--recursive")): [""],
+            (app_root, ("submodule", "update", "--init", "--remote", "--force")): [
                 "Submodule path 'prometheus-core': checked out"
             ],
             (core_root, ("rev-parse", "HEAD")): ["core-before", "core-after"],
+            (core_root, ("sparse-checkout", "init", "--no-cone")): [""],
+            (core_root, ("sparse-checkout", "set", "/*", "!/tools/cli", "!/docs")): [""],
+            (core_root, ("clean", "-ffd")): [""],
         }
 
         def fake_run_git(args, cwd, check=True):
@@ -60,10 +64,14 @@ class TestPullApp:
             (app_root, ("pull", "--ff-only")): [
                 "Updating abc1234..def5678\nFast-forward\n config/app.yml | 2 +-"
             ],
-            (app_root, ("submodule", "update", "--remote")): [
+            (app_root, ("submodule", "sync", "--recursive")): [""],
+            (app_root, ("submodule", "update", "--init", "--remote", "--force")): [
                 "Submodule path 'prometheus-core': checked out"
             ],
             (core_root, ("rev-parse", "HEAD")): ["core-old", "core-new"],
+            (core_root, ("sparse-checkout", "init", "--no-cone")): [""],
+            (core_root, ("sparse-checkout", "set", "/*", "!/tools/cli", "!/docs")): [""],
+            (core_root, ("clean", "-ffd")): [""],
         }
 
         def fake_run_git(args, cwd, check=True):
@@ -95,10 +103,14 @@ class TestPullApp:
         responses = {
             (app_root, ("rev-parse", "HEAD")): ["app-same", "app-same"],
             (app_root, ("pull", "--ff-only")): ["Already up to date."],
-            (app_root, ("submodule", "update", "--remote")): [
+            (app_root, ("submodule", "sync", "--recursive")): [""],
+            (app_root, ("submodule", "update", "--init", "--remote", "--force")): [
                 "Submodule path 'prometheus-core': updated from core-old to core-new"
             ],
             (core_root, ("rev-parse", "HEAD")): ["core-old", "core-new"],
+            (core_root, ("sparse-checkout", "init", "--no-cone")): [""],
+            (core_root, ("sparse-checkout", "set", "/*", "!/tools/cli", "!/docs")): [""],
+            (core_root, ("clean", "-ffd")): [""],
         }
 
         def fake_run_git(args, cwd, check=True):

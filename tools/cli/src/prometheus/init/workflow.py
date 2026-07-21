@@ -731,9 +731,20 @@ class InitWorkflow:
             # stale deletions never get committed/pushed to the shared remote.
             self._repair_legacy_submodule_deletions(core_submodule_path)
             self._cleanup_submodule_folders(core_submodule_path)
-            # Bring the submodule up to date with the latest core commit.
+            # Refresh the submodule's cached remote URL from .gitmodules first -
+            # otherwise a stale cached URL (e.g. left over from an older
+            # core_remote value) causes `--remote` to silently fetch from the
+            # wrong place and appear up to date while missing commits.
             self._run_git(
-                ["submodule", "update", "--remote", "--", "core"],
+                ["submodule", "sync", "--recursive", "--", "core"],
+                cwd=self.instructions_path,
+                check=False,
+            )
+            # Bring the submodule up to date with the latest core commit.
+            # --force discards any dirty/untracked state that would otherwise
+            # block checking out the newly fetched commit.
+            self._run_git(
+                ["submodule", "update", "--init", "--remote", "--force", "--", "core"],
                 cwd=self.instructions_path,
                 check=False,
             )
@@ -823,12 +834,29 @@ class InitWorkflow:
             submodule_path: Path to the core submodule.
         """
         try:
-            self._run_git(["sparse-checkout", "init"], cwd=submodule_path, check=False)
+            # git defaults `sparse-checkout init` to cone mode, which only
+            # understands whole-directory include patterns. It silently
+            # discards exclude patterns like "!/tools/cli" and collapses the
+            # checkout down to root-level files only - making almost the
+            # entire submodule disappear from the working tree even though
+            # HEAD is correct. --no-cone enables full gitignore-style pattern
+            # matching so exclude patterns actually work as intended.
+            self._run_git(
+                ["sparse-checkout", "init", "--no-cone"], cwd=submodule_path, check=False
+            )
             self._run_git(
                 ["sparse-checkout", "set", "/*", "!/tools/cli", "!/docs"],
                 cwd=submodule_path,
                 check=False,
             )
+            # Repos that were previously collapsed by the cone-mode bug above
+            # can be left with stray untracked leftover folders once the
+            # correct patterns are re-applied (sparse-checkout only hides
+            # tracked paths - it never removes untracked ones). The core
+            # submodule is entirely upstream-controlled/read-only (see
+            # push.py), so any untracked content here is always safe to
+            # discard.
+            self._run_git(["clean", "-ffd"], cwd=submodule_path, check=False)
         except Exception:
             # Cleanup is optional - if it fails, the submodule still works
             pass
